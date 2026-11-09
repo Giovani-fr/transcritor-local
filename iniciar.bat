@@ -11,6 +11,7 @@ if not exist "%VENV%\Scripts\python.exe" (
 )
 cd /d "%~dp0"
 set "PYTHONPATH=%~dp0src"
-start "" http://127.0.0.1:8765
+rem abre o navegador depois de 2 s, quando o servidor ja estiver no ar
+start "" cmd /c "timeout /t 2 /nobreak >nul & start "" http://127.0.0.1:8765"
 "%VENV%\Scripts\python.exe" -m uvicorn transcritor.web.app:app --host 127.0.0.1 --port 8765
 pause

@@ -4,10 +4,6 @@ av==15.1.0          # faster-whisper 1.2.1 quebra com av 19 (metadata_errors)
 numpy
 scipy
 
-# GPU Nvidia (CUDA) no Windows, via pip
-nvidia-cublas-cu12
-nvidia-cudnn-cu12==9.*
-
 # Captura de áudio (Windows)
 PyAudioWPatch; sys_platform == "win32"
 
