@@ -1,0 +1,32 @@
+# Ambientes virtuais
+venv/
+.venv/
+
+# Privacidade: nunca versionar áudio, vídeo ou transcrições
+sessoes/
+saidas/
+*.wav
+*.m4a
+*.mp3
+*.mp4
+*.txt
+!requirements.txt
+!requirements-dev.txt
+
+# Planejamento interno
+_planejamento/
+
+# Caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+models/
+.cache/
+huggingface/
+
+# Editor / SO
+.vscode/
+.idea/
+Thumbs.db
