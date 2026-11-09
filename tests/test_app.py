@@ -82,3 +82,47 @@ def test_idioma_invalido_e_id_inexistente(cliente, tmp_path):
 
 def test_parar_sem_trabalho_nao_quebra(cliente):
     assert cliente.post("/api/parar").json() == {"ok": True}
+
+
+# ---------- YouTube ----------
+def _cliente_yt(tmp_path, yt_falso):
+    from test_servico_youtube import YTFalso  # noqa: F401
+    sv = Servico(tmp_path / "saidas", HW, instalado=lambda n, c=None: True,
+                 carregar=lambda hw, c=None: (ModeloFalso(), hw), youtube=yt_falso)
+    sv.iniciar()
+    esperar(lambda: sv.estado_modelo["fase"] == "pronto")
+    return TestClient(criar_app(sv, iniciar=False)), sv
+
+
+def test_api_youtube_consultar_e_transcrever(tmp_path):
+    from test_servico_youtube import URL, YTFalso
+    c, sv = _cliente_yt(tmp_path, YTFalso())
+    with c:
+        r = c.post("/api/youtube/consultar", json={"url": URL})
+        assert r.status_code == 200 and r.json()["titulo"] == "Vídeo de teste"
+        assert r.json()["legendas"]["disponivel"] is True
+        r = c.post("/api/youtube", json={"url": URL, "modo": "rapido"})
+        assert r.status_code == 200
+        esperar(lambda: sv.trabalho["fase"] == "concluido")
+        hist = c.get("/api/historico").json()
+        assert hist[0]["nome"] == "Vídeo de teste" and hist[0]["tipo"] == "youtube"
+        assert c.get(f"/api/historico/{r.json()['id']}/texto?horarios=false").text.startswith("Primeira legenda.")
+
+
+def test_api_youtube_erros_em_linguagem_simples(tmp_path):
+    from test_servico_youtube import URL, YTFalso
+    c, sv = _cliente_yt(tmp_path, YTFalso())
+    with c:
+        r = c.post("/api/youtube/consultar", json={"url": "link invalido"})
+        assert r.status_code == 400 and r.json()["codigo"] == "link_invalido"
+        assert "youtube" in r.json()["detail"].lower() and "Traceback" not in r.json()["detail"]
+        assert c.post("/api/youtube", json={"url": URL, "modo": "magico"}).status_code == 400
+        assert c.post("/api/youtube", json={"url": "link invalido", "modo": "rapido"}).status_code == 400
+
+
+def test_api_youtube_antes_do_modelo_pronto(tmp_path):
+    from test_servico_youtube import URL, YTFalso
+    sv = Servico(tmp_path / "s", HW, instalado=lambda n, c=None: False, youtube=YTFalso())
+    with TestClient(criar_app(sv, iniciar=False)) as c:
+        r = c.post("/api/youtube", json={"url": URL, "modo": "rapido"})
+        assert r.status_code == 409 and r.json()["detail"] == erros.MSG_NAO_PRONTO

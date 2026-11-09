@@ -11,15 +11,28 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from .. import config, erros
 from ..hardware import detectar_hardware
 from ..servico import NaoPronto, Ocupado, Servico
+from ..youtube import ErroYoutube
 
 ESTATICOS = Path(__file__).parent / "static"
 IDIOMAS = {"pt": "pt", "en": "en", "es": "es", "auto": None}
+
+
+class PedidoLink(BaseModel):
+    url: str
+
+
+class PedidoYoutube(BaseModel):
+    url: str
+    modo: str = "rapido"
+    manter_audio: bool = False
+    idioma: str = "pt"
 
 
 class Difusor:
@@ -112,6 +125,31 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
             erros.registrar(servico.saidas, e)
             raise HTTPException(500, erros.MSG_GENERICA)
         return {"id": id_}
+
+    def _erro_youtube(e: ErroYoutube) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": e.mensagem, "codigo": e.codigo, "ajuda": e.ajuda})
+
+    @app.post("/api/youtube/consultar")
+    def consultar_youtube(pedido: PedidoLink):
+        try:
+            return servico.consultar_youtube(pedido.url)
+        except ErroYoutube as e:
+            return _erro_youtube(e)
+
+    @app.post("/api/youtube")
+    def iniciar_youtube(pedido: PedidoYoutube):
+        if pedido.modo not in ("rapido", "preciso") or pedido.idioma not in IDIOMAS:
+            raise HTTPException(400, "Opção não reconhecida.")
+        try:
+            return {"id": servico.iniciar_youtube(pedido.url, pedido.modo, pedido.manter_audio,
+                                                  IDIOMAS[pedido.idioma])}
+        except ErroYoutube as e:
+            return _erro_youtube(e)
+        except (Ocupado, NaoPronto) as e:
+            raise HTTPException(409, str(e))
+        except Exception as e:
+            erros.registrar(servico.saidas, e)
+            raise HTTPException(500, erros.MSG_GENERICA)
 
     @app.post("/api/parar")
     def parar():

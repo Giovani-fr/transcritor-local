@@ -6,6 +6,7 @@ import traceback
 from pathlib import Path
 
 from .motor import ArquivoIlegivel
+from .youtube import ErroYoutube
 
 MSG_ARQUIVO = ("Não consegui abrir esse arquivo. Confira se é um áudio ou vídeo comum "
                "(mp3, wav, m4a, mp4...) e se não está corrompido.")
@@ -32,6 +33,8 @@ def registrar(pasta_saidas: Path, exc: BaseException) -> None:
 
 
 def traduzir_erro(exc: BaseException) -> str:
+    if isinstance(exc, ErroYoutube):
+        return exc.mensagem
     if isinstance(exc, ArquivoIlegivel):
         return MSG_ARQUIVO
     if isinstance(exc, MemoryError) or "out of memory" in str(exc).lower():

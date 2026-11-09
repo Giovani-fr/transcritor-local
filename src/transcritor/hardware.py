@@ -16,6 +16,8 @@ AVISO_CPU = ("Não encontrei uma placa de vídeo Nvidia compatível, então vou 
              "Funciona normalmente, só é mais lento e um pouco menos preciso: um arquivo pode "
              "levar alguns minutos para ficar pronto e a gravação ao vivo pode atrasar um pouco.")
 
+AVISO_CPU_CURTO = "Sem placa de vídeo Nvidia: vou usar o processador (mais lento)."
+
 _dll_ok = False
 
 

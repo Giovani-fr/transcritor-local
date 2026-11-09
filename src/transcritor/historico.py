@@ -54,6 +54,8 @@ class Historico:
                 meta = json.loads((p / ARQ_META).read_text(encoding="utf-8"))
             except Exception:
                 continue
+            if meta.get("status") == "erro":
+                continue                        # erros ficam só no registro.log
             if meta.get("status") == "em_andamento" and not (p / ARQ_TEXTO).exists():
                 continue
             if meta.get("status") == "em_andamento":
