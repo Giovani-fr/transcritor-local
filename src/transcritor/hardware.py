@@ -85,15 +85,21 @@ class Hardware:
     gpu: str = ""
     ram_gb: float = 0.0
     aviso: str = ""
+    cpu_threads: int = 0      # 0 = deixar o faster-whisper escolher
 
     def como_cpu(self, modelo: str = MODELO_CPU, aviso: str = AVISO_CPU) -> "Hardware":
-        return Hardware(False, modelo, "cpu", "int8", self.gpu, self.ram_gb, aviso)
+        return Hardware(False, modelo, "cpu", "int8", self.gpu, self.ram_gb, aviso, self.cpu_threads)
 
 
-def detectar_hardware(forcar_cpu: bool = False) -> Hardware:
-    """Escolhe dispositivo e modelo: GPU Nvidia → large-v3-turbo; senão CPU → small/base."""
+def detectar_hardware(forcar_cpu: bool = False, modelo: str | None = None,
+                      cpu_threads: int = 0) -> Hardware:
+    """Escolhe dispositivo e modelo: GPU Nvidia → large-v3-turbo; senão CPU → small/base.
+
+    ``modelo`` e ``cpu_threads`` permitem forçar a escolha (testes e medições).
+    """
     ram = ram_total_gb()
     if not forcar_cpu and _cuda_disponivel():
-        return Hardware(True, MODELO_GPU, "cuda", "int8_float16", _nome_gpu(), ram)
-    modelo = MODELO_CPU_FRACO if 0 < ram < RAM_MINIMA_SMALL_GB else MODELO_CPU
-    return Hardware(False, modelo, "cpu", "int8", "", ram, AVISO_CPU)
+        return Hardware(True, modelo or MODELO_GPU, "cuda", "int8_float16", _nome_gpu(), ram,
+                        cpu_threads=cpu_threads)
+    padrao = MODELO_CPU_FRACO if 0 < ram < RAM_MINIMA_SMALL_GB else MODELO_CPU
+    return Hardware(False, modelo or padrao, "cpu", "int8", "", ram, AVISO_CPU, cpu_threads)

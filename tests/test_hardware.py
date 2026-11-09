@@ -38,7 +38,7 @@ def test_falha_na_gpu_cai_para_cpu(monkeypatch):
     import faster_whisper
     usados = []
 
-    def falso(modelo, device, compute_type):
+    def falso(modelo, device, compute_type, **kw):
         usados.append((modelo, device))
         if device == "cuda":
             raise RuntimeError("cublas64_12.dll not found")

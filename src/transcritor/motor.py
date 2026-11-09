@@ -48,18 +48,20 @@ def normalizar_para_whisper(audio: np.ndarray) -> np.ndarray | None:
     return np.clip(audio * ganho, -1.0, 1.0).astype(np.float32)
 
 
-def carregar_modelo(hw: Hardware | None = None):
+def carregar_modelo(hw: Hardware | None = None, cache_dir: str | None = None):
     """Carrega o WhisperModel. Se a GPU falhar, cai para CPU. Devolve (modelo, hardware usado)."""
     hw = hw or detectar_hardware()
     preparar_cuda()
     from faster_whisper import WhisperModel
     try:
-        return WhisperModel(hw.modelo, device=hw.device, compute_type=hw.compute_type), hw
+        return WhisperModel(hw.modelo, device=hw.device, compute_type=hw.compute_type,
+                            cpu_threads=hw.cpu_threads, download_root=cache_dir), hw
     except Exception:
         if not hw.usa_gpu:
             raise
         hw = hw.como_cpu(aviso="Não consegui usar a placa de vídeo; vou usar o processador (mais lento).")
-        return WhisperModel(hw.modelo, device="cpu", compute_type="int8"), hw
+        return WhisperModel(hw.modelo, device="cpu", compute_type="int8",
+                            cpu_threads=hw.cpu_threads, download_root=cache_dir), hw
 
 
 def processar_trecho(modelo, audio: np.ndarray, t0: float,

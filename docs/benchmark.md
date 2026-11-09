@@ -18,13 +18,30 @@ Fala real com ruído pode ser um pouco mais lenta e menos precisa.
 "N× tempo real" = quantos segundos de áudio são transcritos por segundo de processamento.
 Na gravação ao vivo, enquanto cada trecho de 30 s demorar bem menos que 30 s para ser processado, o texto não acumula atraso.
 
+## Estimativa para o requisito mínimo (4 núcleos)
+
+Para estimar um PC mais simples, limitei o Whisper a **4 threads** (`cpu_threads=4`) neste mesmo notebook, com o mesmo áudio:
+
+| Modelo | Threads | Arquivo de 173 s | Velocidade | Trecho ao vivo de 30 s (média / pior) |
+|---|---|---|---|---|
+| `small` | 4 | 56,7 s | **3,1× tempo real** | 13,2 s / 15,1 s |
+| `base` | 4 | 24,4 s | **7,1× tempo real** | 4,4 s / 6,1 s |
+
+**Isto é uma estimativa, não uma medição em um PC de 4 núcleos.** Limitar threads simula a *quantidade* de núcleos, mas não a *velocidade* deles:
+os núcleos deste i5 de 13ª geração são rápidos, e uma CPU de 4 núcleos mais antiga ou de entrada provavelmente será mais lenta que estes números
+(e a RAM de 8 GB também não foi simulada). Leia como o "melhor caso" do requisito mínimo.
+
 ## Leitura dos números
 
-- Em CPU como esta (8 núcleos), o modelo `small` transcreve ~4× mais rápido que o tempo real: uma reunião de 1 hora fica pronta em cerca de 16 min,
-  e a gravação ao vivo acompanha com folga (≈9 s de processamento por trecho de 30 s).
-- O `base` é ~2,7× mais rápido que o `small`, mas erra mais (ver limitações abaixo).
-- **Não medido:** CPU de 4 núcleos / 8 GB de RAM (requisito mínimo declarado). Este notebook tem o dobro de núcleos;
-  em uma CPU mais fraca os tempos serão maiores. Os números acima valem para esta máquina, não para o requisito mínimo.
+- Em CPU como esta, o `small` transcreve de 3 a 4× mais rápido que o tempo real: uma reunião de 1 hora fica pronta em ~16 a 20 min,
+  e a gravação ao vivo acompanha (≈9 a 13 s de processamento por trecho de 30 s).
+- O `base` é de 2,3 a 2,7× mais rápido que o `small`, mas erra mais (ver abaixo).
+
+## Ressalvas (para o README)
+
+- Os números usam **fala sintética limpa**; fala real com ruído, sotaques ou várias pessoas pode ser mais lenta e menos precisa.
+- Valem para **este notebook** (i5-13420H + RTX 3050), não para PCs mais fracos.
+- **Em CPU, modelos pequenos alucinam mais sobre ruído** (detalhes abaixo).
 
 ## Limitações observadas nos testes com ruído sintético
 
