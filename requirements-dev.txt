@@ -1,2 +1,3 @@
 -r requirements.txt
 pytest
+playwright      # só para gerar os prints do README (scripts/capturar_prints.py)

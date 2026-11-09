@@ -17,7 +17,7 @@
       <svg class="marca-icone" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M9 12v8M13.5 9v14M18 13v6M22.5 10.5v11" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>
       <div>
         <h1>Transcritor local</h1>
-        <p>Roda no seu computador · sem internet · sem custo</p>
+        <p>Roda no seu computador · sem custo</p>
       </div>
     </div>
     <button id="btn-tema" class="btn-icone" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
@@ -32,12 +32,18 @@
     </div>
 
     <nav class="abas" aria-label="Escolha o que transcrever">
-      <button class="aba ativa" type="button" aria-current="page">Arquivo</button>
-      <button class="aba" type="button" disabled title="Em breve">YouTube <span class="em-breve">em breve</span></button>
+      <button class="aba ativa" type="button" data-aba="arquivo">Arquivo</button>
+      <button class="aba" type="button" data-aba="youtube">YouTube</button>
       <button class="aba" type="button" disabled title="Em breve">Gravar <span class="em-breve">em breve</span></button>
     </nav>
 
-    <div id="banner-hw" class="aviso" hidden></div>
+    <div id="banner-hw" class="aviso" hidden>
+      <div class="banner-linha">
+        <span id="hw-msg"></span>
+        <button id="hw-mais" class="link" type="button" aria-expanded="false" aria-controls="hw-detalhe" hidden>Saiba mais</button>
+      </div>
+      <p id="hw-detalhe" class="banner-detalhe" hidden></p>
+    </div>
 
     <!-- Primeiro uso / preparo do modelo -->
     <section id="tela-modelo" class="cartao" hidden aria-live="polite">
@@ -71,11 +77,11 @@
       </div>
     </section>
 
-    <!-- Aba Arquivo -->
-    <section id="painel-arquivo" class="cartao" hidden>
+    <!-- Área de trabalho (abas Arquivo e YouTube compartilham andamento e resultado) -->
+    <section id="painel" class="cartao" hidden>
 
-      <!-- 1) início -->
-      <div id="arq-inicio">
+      <!-- 1a) início: Arquivo -->
+      <div id="inicio-arquivo">
         <div id="zona" class="zona" tabindex="-1">
           <svg class="zona-icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
           <p class="zona-titulo">Arraste um áudio ou vídeo para cá</p>
@@ -97,8 +103,64 @@
         </details>
       </div>
 
+      <!-- 1b) início: YouTube -->
+      <div id="inicio-youtube" hidden>
+        <form id="form-yt" class="campo-link" autocomplete="off">
+          <label for="yt-url" class="rotulo">Link do vídeo do YouTube</label>
+          <div class="linha-link">
+            <input id="yt-url" type="text" inputmode="url" placeholder="Cole aqui o link do vídeo" spellcheck="false" autocapitalize="off">
+            <button id="btn-yt-buscar" class="btn btn-primario" type="submit">Buscar vídeo</button>
+          </div>
+        </form>
+        <div id="yt-erro" class="aviso aviso-erro" role="alert" hidden></div>
+
+        <div id="yt-video" class="video" hidden>
+          <div class="video-info">
+            <p id="yt-titulo" class="video-titulo"></p>
+            <p id="yt-detalhes" class="miudo"></p>
+            <p id="yt-legenda-info" class="miudo"></p>
+          </div>
+          <fieldset class="modos">
+            <legend class="rotulo">Como transcrever?</legend>
+            <label class="modo">
+              <input type="radio" name="yt-modo" value="rapido" checked>
+              <span class="modo-corpo"><strong>Rápido</strong>
+                <small>Lê as legendas do vídeo. Pronto na hora, mas só é tão bom quanto a legenda do YouTube.</small></span>
+            </label>
+            <label class="modo">
+              <input type="radio" name="yt-modo" value="preciso">
+              <span class="modo-corpo"><strong>Preciso</strong>
+                <small>Baixa o áudio e transcreve aqui no seu computador. Demora mais, mas fica mais fiel e funciona sem legendas.</small></span>
+            </label>
+          </fieldset>
+          <div id="yt-sem-legenda" class="aviso" hidden>
+            <p>Esse vídeo não tem legendas, então o modo Rápido não tem o que ler. O modo <strong>Preciso</strong> baixa o áudio e transcreve aqui no seu computador: demora mais, mas funciona mesmo sem legendas.</p>
+            <button id="btn-yt-usar-preciso" class="btn btn-sec" type="button">Usar o modo Preciso</button>
+          </div>
+          <button id="btn-yt-transcrever" class="btn btn-primario" type="button">Transcrever</button>
+        </div>
+
+        <details class="avancado">
+          <summary>Avançado</summary>
+          <label class="campo">
+            <span>Idioma da fala (modo Preciso)</span>
+            <select id="yt-idioma">
+              <option value="pt">Português</option>
+              <option value="en">Inglês</option>
+              <option value="es">Espanhol</option>
+              <option value="auto">Detectar automaticamente</option>
+            </select>
+          </label>
+          <label class="marcar">
+            <input id="yt-manter" type="checkbox">
+            <span>Guardar o áudio baixado (modo Preciso). Por padrão ele é apagado ao terminar.</span>
+          </label>
+        </details>
+      </div>
+
       <!-- 2) em andamento -->
       <div id="arq-andamento" hidden aria-live="polite">
+        <p id="and-tipo" class="miudo"></p>
         <h2 class="nome-arquivo" id="and-nome"></h2>
         <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="barra-job"><div></div></div>
         <div class="linha-status">
@@ -119,8 +181,13 @@
           <span id="fim-selo" class="selo"></span>
         </div>
         <p id="fim-meta" class="miudo"></p>
+        <a id="fim-link" class="miudo link-externo" target="_blank" rel="noopener noreferrer" hidden>Abrir o vídeo no YouTube</a>
         <p id="fim-aviso" class="aviso" hidden></p>
         <p id="fim-erro" class="aviso aviso-erro" role="alert" hidden></p>
+        <div id="fim-ajuda" hidden></div>
+        <div id="fim-acao-preciso" class="acoes" hidden>
+          <button id="btn-fim-preciso" class="btn btn-primario" type="button">Transcrever no modo Preciso</button>
+        </div>
         <div id="fim-texto-bloco">
           <label class="chave">
             <input id="chk-horarios" type="checkbox" checked>
@@ -135,7 +202,7 @@
           <div id="texto-final" class="texto" tabindex="0" aria-label="Texto transcrito"></div>
         </div>
         <div class="acoes">
-          <button id="btn-outro" class="btn btn-sec" type="button">Transcrever outro arquivo</button>
+          <button id="btn-outro" class="btn btn-sec" type="button">Fazer outra transcrição</button>
         </div>
       </div>
     </section>
