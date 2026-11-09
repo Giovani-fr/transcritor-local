@@ -8,8 +8,9 @@ Lições preservadas do protótipo:
 """
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Callable, Iterator
 
 import numpy as np
 
@@ -86,12 +87,42 @@ def processar_trecho(modelo, audio: np.ndarray, t0: float,
     return linhas
 
 
-def transcrever_arquivo(modelo, caminho_ou_audio) -> Iterator[Linha]:
-    """Transcreve um áudio/vídeo existente (caminho ou array 16 kHz), linha a linha."""
+class ArquivoIlegivel(Exception):
+    """O arquivo não é um áudio/vídeo que o programa consiga abrir."""
+
+
+def transcrever_arquivo(modelo, caminho: str, idioma: str | None = "pt",
+                        parar: threading.Event | None = None,
+                        ao_progresso: Callable[[float, float], None] | None = None) -> Iterator[Linha]:
+    """Transcreve um áudio/vídeo existente, gerando as linhas conforme ficam prontas.
+
+    ``idioma=None`` detecta o idioma sozinho. ``ao_progresso(segundos_feitos, duracao)`` é
+    chamado a cada trecho (e uma vez no começo, quando a duração já é conhecida).
+    ``parar`` interrompe entre dois trechos; o que já saiu continua valendo.
+    """
+    from faster_whisper.audio import decode_audio
+    try:
+        audio = decode_audio(caminho, sampling_rate=TARGET_SR)
+    except Exception as e:
+        raise ArquivoIlegivel(str(e)) from e
+    if len(audio) == 0:
+        raise ArquivoIlegivel("áudio vazio")
+    duracao = len(audio) / TARGET_SR
+    if ao_progresso:
+        ao_progresso(0.0, duracao)
+    audio_n = normalizar_para_whisper(audio)       # só para o Whisper; o arquivo original não muda
+    if audio_n is None or (parar and parar.is_set()):
+        return
     segs, _ = modelo.transcribe(
-        caminho_ou_audio, language="pt", vad_filter=True, vad_parameters=dict(VAD),
+        audio_n, language=idioma, vad_filter=True, vad_parameters=dict(VAD),
         condition_on_previous_text=False)
     for s in segs:
+        if parar and parar.is_set():
+            return
+        if ao_progresso:
+            ao_progresso(min(s.end, duracao), duracao)
         texto = s.text.strip()
         if texto and not eh_alucinacao(texto):
             yield Linha(s.start, texto)
+    if ao_progresso:
+        ao_progresso(duracao, duracao)
