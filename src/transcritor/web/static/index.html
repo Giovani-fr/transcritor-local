@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Transcritor local</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M9 12v8M13.5 9v14M18 13v6M22.5 10.5v11' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    try { var t = localStorage.getItem("tema"); if (t) document.documentElement.dataset.tema = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <svg class="marca-icone" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M9 12v8M13.5 9v14M18 13v6M22.5 10.5v11" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>
+      <div>
+        <h1>Transcritor local</h1>
+        <p>Roda no seu computador · sem internet · sem custo</p>
+      </div>
+    </div>
+    <button id="btn-tema" class="btn-icone" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+      <svg class="icone-lua" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg class="icone-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </header>
+
+  <main class="app">
+    <div id="conexao" class="aviso aviso-erro" role="alert" hidden>
+      Perdi a conexão com o programa. Se você fechou a janela preta, abra o <strong>iniciar.bat</strong> de novo.
+    </div>
+
+    <nav class="abas" aria-label="Escolha o que transcrever">
+      <button class="aba ativa" type="button" aria-current="page">Arquivo</button>
+      <button class="aba" type="button" disabled title="Em breve">YouTube <span class="em-breve">em breve</span></button>
+      <button class="aba" type="button" disabled title="Em breve">Gravar <span class="em-breve">em breve</span></button>
+    </nav>
+
+    <div id="banner-hw" class="aviso" hidden></div>
+
+    <!-- Primeiro uso / preparo do modelo -->
+    <section id="tela-modelo" class="cartao" hidden aria-live="polite">
+      <div id="modelo-verificando" hidden>
+        <h2>Verificando seu computador…</h2>
+        <div class="barra indeterminada"><div></div></div>
+      </div>
+      <div id="modelo-faltando" hidden>
+        <h2>Primeiro uso: vamos preparar o transcritor</h2>
+        <p>Para transcrever sem internet, preciso baixar o <strong>modelo de voz</strong>
+           (cerca de <strong id="modelo-tamanho">1,5 GB</strong>).
+           <strong>Isso é só na primeira vez</strong> — depois tudo funciona direto no seu computador.</p>
+        <p id="modelo-erro" class="aviso aviso-erro" hidden></p>
+        <button id="btn-baixar" class="btn btn-primario" type="button">Baixar e começar</button>
+      </div>
+      <div id="modelo-baixando" hidden>
+        <h2>Baixando o modelo de voz…</h2>
+        <p>Só na primeira vez. Pode deixar esta janela aberta; se a internet cair, é só tentar de novo — o que já foi baixado não se perde.</p>
+        <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="barra-modelo"><div></div></div>
+        <p id="modelo-progresso" class="miudo"></p>
+      </div>
+      <div id="modelo-carregando" hidden>
+        <h2>Preparando o modelo…</h2>
+        <p>Isso leva alguns segundos.</p>
+        <div class="barra indeterminada"><div></div></div>
+      </div>
+      <div id="modelo-erro-fatal" hidden>
+        <h2>Não consegui preparar o transcritor</h2>
+        <p id="modelo-erro-msg" class="aviso aviso-erro"></p>
+        <button id="btn-tentar-modelo" class="btn btn-primario" type="button">Tentar de novo</button>
+      </div>
+    </section>
+
+    <!-- Aba Arquivo -->
+    <section id="painel-arquivo" class="cartao" hidden>
+
+      <!-- 1) início -->
+      <div id="arq-inicio">
+        <div id="zona" class="zona" tabindex="-1">
+          <svg class="zona-icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+          <p class="zona-titulo">Arraste um áudio ou vídeo para cá</p>
+          <p class="miudo">mp3, wav, m4a, mp4, mkv, ogg… qualquer duração</p>
+          <button id="btn-escolher" class="btn btn-primario" type="button">Escolher arquivo</button>
+          <input id="entrada-arquivo" type="file" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.mp4,.mkv,.mov,.avi,.webm,.m4v" hidden>
+        </div>
+        <details class="avancado">
+          <summary>Avançado</summary>
+          <label class="campo">
+            <span>Idioma da fala</span>
+            <select id="idioma">
+              <option value="pt">Português</option>
+              <option value="en">Inglês</option>
+              <option value="es">Espanhol</option>
+              <option value="auto">Detectar automaticamente</option>
+            </select>
+          </label>
+        </details>
+      </div>
+
+      <!-- 2) em andamento -->
+      <div id="arq-andamento" hidden aria-live="polite">
+        <h2 class="nome-arquivo" id="and-nome"></h2>
+        <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="barra-job"><div></div></div>
+        <div class="linha-status">
+          <span id="and-status"></span>
+          <span id="and-restante" class="miudo"></span>
+        </div>
+        <div class="acoes">
+          <button id="btn-parar" class="btn btn-perigo" type="button">Parar</button>
+        </div>
+        <h3 class="subtitulo">Texto até agora</h3>
+        <div id="texto-vivo" class="texto" tabindex="0" aria-label="Texto transcrito até agora"></div>
+      </div>
+
+      <!-- 3) resultado -->
+      <div id="arq-fim" hidden>
+        <div class="fim-topo">
+          <h2 class="nome-arquivo" id="fim-nome"></h2>
+          <span id="fim-selo" class="selo"></span>
+        </div>
+        <p id="fim-meta" class="miudo"></p>
+        <p id="fim-aviso" class="aviso" hidden></p>
+        <p id="fim-erro" class="aviso aviso-erro" role="alert" hidden></p>
+        <div id="fim-texto-bloco">
+          <label class="chave">
+            <input id="chk-horarios" type="checkbox" checked>
+            <span class="chave-trilho" aria-hidden="true"></span>
+            <span>Mostrar horários</span>
+          </label>
+          <div class="acoes">
+            <button id="btn-copiar" class="btn btn-primario" type="button">Copiar texto</button>
+            <button id="btn-baixar-txt" class="btn btn-sec" type="button">Baixar .txt</button>
+            <button id="btn-pasta" class="btn btn-sec" type="button">Abrir pasta</button>
+          </div>
+          <div id="texto-final" class="texto" tabindex="0" aria-label="Texto transcrito"></div>
+        </div>
+        <div class="acoes">
+          <button id="btn-outro" class="btn btn-sec" type="button">Transcrever outro arquivo</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="historico" class="historico" hidden>
+      <h2>Transcrições anteriores</h2>
+      <ul id="lista-historico" class="lista"></ul>
+      <p id="historico-vazio" class="miudo">Suas transcrições vão aparecer aqui.</p>
+    </section>
+  </main>
+
+  <div id="aviso-rapido" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

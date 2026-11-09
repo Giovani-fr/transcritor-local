@@ -183,6 +183,20 @@ def test_parar_mantem_o_texto_parcial(tmp_path, eventos):
     meta = json.loads((s.historico.caminho(id_) / "meta.json").read_text(encoding="utf-8"))
     assert meta["status"] == "parado" and meta["linhas"] == 1
     assert s.texto(id_, True) == "[00:00:00] Primeira frase."
+    assert "parou no meio" in s.trabalho["aviso"]
+
+
+def test_parar_antes_de_sair_texto_explica(tmp_path):
+    liberar = threading.Event()
+    s = Servico(tmp_path / "s", HW, instalado=lambda n, c=None: True,
+                carregar=lambda hw, c=None: (ModeloFalso(segs=[Seg(0, 3, "Só uma."), Seg(3, 6, "Outra.")],
+                                                         atraso=0.5), hw))
+    s.iniciar(); esperar(lambda: s.estado_modelo["fase"] == "pronto")
+    s.iniciar_arquivo(wav_sintetico(tmp_path / "a.wav"), "a.wav")
+    esperar(lambda: s.trabalho["fase"] == "transcrevendo")
+    s.parar()
+    esperar(lambda: s.trabalho["fase"] == "parado")
+    assert s.trabalho["aviso"] == "Você parou antes de aparecer algum texto."
 
 
 def test_arquivo_que_nao_e_audio_da_erro_em_linguagem_simples(servico, tmp_path):

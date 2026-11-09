@@ -214,6 +214,10 @@ class Servico:
         aviso = ""
         if status == "concluido" and n == 0:
             aviso = "Não encontrei fala nesse arquivo. Confira se ele tem voz e se o volume não está muito baixo."
+        if status == "parado" and n == 0:
+            aviso = "Você parou antes de aparecer algum texto."
+        elif status == "parado":
+            aviso = "Você parou no meio: este é o texto que ficou pronto até aqui."
         meta = {"nome": self.trabalho["nome"], "tipo": "arquivo", "status": status, "linhas": n,
                 "criado": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(inicio)),
                 "duracao_s": round(duracao, 1) if duracao else None,
