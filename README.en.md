@@ -17,4 +17,6 @@ Full documentation (features, requirements, install) will be added in Phase 4.
 - **Recordings and meetings.** Tell people and get their consent before recording a conversation or meeting.
 - **Tests.** The automated tests use no third-party videos: they use synthetic audio and simulations. The only test that
   needs the internet (`pytest -m rede`, optional) uses a NASA video, generally public-domain material.
+- **Example video.** The video shown in this project's examples and screenshots is from **NASA Goddard** (public
+  domain, unless otherwise noted).
 

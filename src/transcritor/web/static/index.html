@@ -34,7 +34,7 @@
     <nav class="abas" aria-label="Escolha o que transcrever">
       <button class="aba ativa" type="button" data-aba="arquivo">Arquivo</button>
       <button class="aba" type="button" data-aba="youtube">YouTube</button>
-      <button class="aba" type="button" disabled title="Em breve">Gravar <span class="em-breve">em breve</span></button>
+      <button class="aba" type="button" data-aba="gravar">Gravar</button>
     </nav>
 
     <div id="banner-hw" class="aviso" hidden>
@@ -158,12 +158,67 @@
         </details>
       </div>
 
+      <!-- 1c) início: Gravar -->
+      <div id="inicio-gravar" hidden>
+        <div id="grav-indisponivel" class="aviso" role="alert" hidden></div>
+        <div id="grav-ok">
+          <fieldset class="modos">
+            <legend class="rotulo">O que gravar?</legend>
+            <label class="modo">
+              <input type="radio" name="grav-fonte" value="reuniao" checked>
+              <span class="modo-corpo"><strong>Reunião</strong>
+                <small>Grava o som do computador e o seu microfone. Serve para Meet, Zoom e Teams.</small></span>
+            </label>
+            <label class="modo">
+              <input type="radio" name="grav-fonte" value="ambiente">
+              <span class="modo-corpo"><strong>Ambiente</strong>
+                <small>Grava só o microfone: aula, palestra, conversa na sala.</small></span>
+            </label>
+          </fieldset>
+
+          <div class="bloco-nivel">
+            <p class="rotulo">Nível do som</p>
+            <div id="med-previa" class="medidores"></div>
+            <p class="miudo">Por enquanto o som só está sendo medido: nada é gravado até você clicar em Iniciar.</p>
+          </div>
+
+          <div id="grav-erro" class="aviso aviso-erro" role="alert" hidden></div>
+
+          <div id="grav-aviso-reuniao" class="aviso confirmar" role="alertdialog" aria-labelledby="grav-aviso-titulo" hidden>
+            <p id="grav-aviso-titulo"><strong>Antes de gravar:</strong> avise os participantes de que a reunião será gravada e transcrita.</p>
+            <div class="acoes">
+              <button id="btn-grav-confirmar" class="btn btn-primario" type="button">Avisei, iniciar gravação</button>
+              <button id="btn-grav-voltar" class="btn btn-sec" type="button">Voltar</button>
+            </div>
+          </div>
+
+          <button id="btn-gravar-iniciar" class="btn btn-primario btn-grande" type="button"><span class="ponto-rec" aria-hidden="true"></span>Iniciar gravação</button>
+
+          <details class="avancado">
+            <summary>Avançado</summary>
+            <label class="campo">
+              <span>Microfone</span>
+              <select id="grav-mic"></select>
+            </label>
+          </details>
+        </div>
+      </div>
+
       <!-- 2) em andamento -->
       <div id="arq-andamento" hidden aria-live="polite">
         <p id="and-tipo" class="miudo"></p>
         <h2 class="nome-arquivo" id="and-nome"></h2>
+        <div id="grav-extra" hidden>
+          <div class="grav-topo">
+            <span id="grav-ponto" class="ponto-rec" aria-hidden="true"></span>
+            <strong id="grav-estado"></strong>
+            <span id="grav-tempo" class="grav-tempo"></span>
+          </div>
+          <div id="med-grav" class="medidores"></div>
+          <p id="grav-atraso" class="aviso" role="status" hidden></p>
+        </div>
         <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="barra-job"><div></div></div>
-        <div class="linha-status">
+        <div class="linha-status" id="linha-status">
           <span id="and-status"></span>
           <span id="and-restante" class="miudo"></span>
         </div>
@@ -187,6 +242,9 @@
         <div id="fim-ajuda" hidden></div>
         <div id="fim-acao-preciso" class="acoes" hidden>
           <button id="btn-fim-preciso" class="btn btn-primario" type="button">Transcrever no modo Preciso</button>
+        </div>
+        <div id="fim-acao-pasta" class="acoes" hidden>
+          <button id="btn-fim-pasta" class="btn btn-primario" type="button">Abrir pasta com o áudio</button>
         </div>
         <div id="fim-texto-bloco">
           <label class="chave">

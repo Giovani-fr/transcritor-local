@@ -12,13 +12,16 @@ from pathlib import Path
 from typing import Callable
 
 from . import erros, modelos, motor
+from .captura import MSG_CAPTURA, DispositivosWasapi, ErroCaptura
+from .gravacao import ATRASO_AVISO_S, Gravacao, Previa
 from .hardware import AVISO_CPU_CURTO, Hardware, detectar_hardware
 from .historico import ARQ_TEXTO, Historico
 from .motor import Linha, formatar_tempo
-from .youtube import ErroYoutube, ProvedorYoutube, escolher_legenda, extrair_id
+from .youtube import ErroYoutube, ProvedorYoutube, atualizar_ytdlp, escolher_legenda, extrair_id, versao_ytdlp
 
 Publicar = Callable[[str, dict], None]
-FASES_ATIVAS = ("preparando", "baixando", "transcrevendo", "parando")
+FASES_ATIVAS = ("preparando", "baixando", "transcrevendo", "gravando", "parando")
+FONTES = {"reuniao": "reunião", "ambiente": "ambiente"}
 
 
 class Ocupado(Exception):
@@ -51,11 +54,18 @@ class Servico:
                  detectar: Callable[[], Hardware] = detectar_hardware,
                  instalado: Callable = modelos.instalado, baixar: Callable = modelos.baixar,
                  carregar: Callable = motor.carregar_modelo, publicar: Publicar | None = None,
-                 youtube: ProvedorYoutube | None = None):
+                 youtube: ProvedorYoutube | None = None, dispositivos=None,
+                 atualizar_ytdlp: Callable[[], dict] = atualizar_ytdlp,
+                 versao_ytdlp: Callable[[], str] = versao_ytdlp):
         self.saidas, self.cache_dir = Path(saidas), cache_dir
         self.historico = Historico(self.saidas)
         self._detectar, self._instalado, self._baixar, self._carregar = detectar, instalado, baixar, carregar
         self.yt = youtube or ProvedorYoutube()
+        self.dispositivos = dispositivos or DispositivosWasapi()
+        self._atualizar_ytdlp, self._versao_ytdlp = atualizar_ytdlp, versao_ytdlp
+        self._atualizando = False
+        self._previa: Previa | None = None
+        self._lock_previa = threading.Lock()
         self._info_cache: dict[str, dict] = {}     # evita consultar o YouTube de novo ao clicar em Transcrever
         self._hw = hw
         self.publicar: Publicar = publicar or (lambda tipo, dados: None)
@@ -150,7 +160,7 @@ class Servico:
         with self.lock:
             if self.estado_modelo["fase"] != "pronto" or self.modelo is None:
                 raise NaoPronto(erros.MSG_NAO_PRONTO)
-            if self.trabalho and self.trabalho["fase"] in FASES_ATIVAS:
+            if self._ocupado():
                 raise Ocupado(erros.MSG_OCUPADO)
             id_, pasta = self.historico.nova(nome)
             self._parar = threading.Event()
@@ -158,7 +168,8 @@ class Servico:
             self.trabalho = {"id": id_, "tipo": tipo, "nome": nome, "fase": "preparando", "progresso": 0.0,
                              "restante_s": None, "decorrido_s": 0.0, "duracao_s": None, "erro": "",
                              "aviso": "", "codigo_erro": "", "ajuda": None, "url": "", "modo": "",
-                             "canal": "", "legenda": "", "audio_guardado": False, **extra}
+                             "canal": "", "legenda": "", "audio_guardado": False, "fonte": "", "gravado_s": 0.0,
+                             "atraso_s": 0.0, "atrasado": False, "pendentes": 0, **extra}
             parar = self._parar
         self.historico.gravar_meta(pasta, {"nome": nome, "tipo": tipo, "status": "em_andamento",
                                            "criado": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -166,13 +177,16 @@ class Servico:
         self._pub()
         return id_, pasta, parar
 
+    def _ocupado(self) -> bool:
+        return bool(self._atualizando or (self.trabalho and self.trabalho["fase"] in FASES_ATIVAS))
+
     def _meta_extra(self) -> dict:
         t = self.trabalho or {}
-        return {k: t[k] for k in ("url", "modo", "canal") if t.get(k)}
+        return {k: t[k] for k in ("url", "modo", "canal", "fonte") if t.get(k)}
 
     def parar(self) -> None:
         with self.lock:
-            if self.trabalho and self.trabalho["fase"] in ("preparando", "baixando", "transcrevendo"):
+            if self.trabalho and self.trabalho["fase"] in ("preparando", "baixando", "transcrevendo", "gravando"):
                 self._parar.set()
                 self.trabalho["fase"] = "parando"
         self._pub()
@@ -231,13 +245,16 @@ class Servico:
         return n, duracao[0]
 
     def _executar(self, id_: str, pasta: Path, parar: threading.Event, fazer: Callable[[], tuple[int, float | None]],
-                  limpar: Callable[[], None] | None = None) -> None:
-        """Roda o trabalho numa thread que nunca morre em silêncio e grava o resultado."""
+                  limpar: Callable[[], None] | None = None, parada_normal: bool = False) -> None:
+        """Roda o trabalho numa thread que nunca morre em silêncio e grava o resultado.
+
+        ``parada_normal``: parar é o jeito normal de terminar (gravação ao vivo), não um corte no meio.
+        """
         inicio = time.time()
         status, erro, codigo, ajuda, n, duracao = "concluido", "", "", None, 0, None
         try:
             n, duracao = fazer()
-            if parar.is_set():
+            if parar.is_set() and not parada_normal:
                 status = "parado"
         except ErroYoutube as e:
             if e.codigo == "cancelado":
@@ -254,21 +271,28 @@ class Servico:
         with self.lock:
             n = n or len(self.linhas)
             t = dict(self.trabalho)
-        aviso = ""
-        if status == "concluido" and n == 0:
+        aviso = t.get("aviso_fim") or ""
+        gravacao = t["tipo"] == "gravacao"
+        if aviso:
+            pass
+        elif status == "concluido" and n == 0 and gravacao:
+            aviso = ("Não encontrei fala na gravação. Confira se o volume do microfone está bom na próxima vez. "
+                     "O áudio ficou salvo na pasta.")
+        elif status == "concluido" and n == 0:
             aviso = "Não encontrei fala nesse arquivo. Confira se ele tem voz e se o volume não está muito baixo."
         elif status == "parado" and n == 0:
             aviso = "Você parou antes de aparecer algum texto."
         elif status == "parado":
             aviso = "Você parou no meio: este é o texto que ficou pronto até aqui."
-        if status in ("erro", "parado") and n == 0:
+        if status in ("erro", "parado") and n == 0 and not gravacao:
             shutil.rmtree(pasta, ignore_errors=True)          # sem texto não há o que guardar; erros ficam só no registro.log
-        else:
-            meta = {"nome": t["nome"], "tipo": t["tipo"], "status": status, "linhas": n,
+        else:                                                 # gravação: o áudio original nunca é apagado
+            meta = {"nome": t["nome"], "tipo": t["tipo"],
+                    "status": "interrompido" if (gravacao and status == "erro") else status, "linhas": n,
                     "criado": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(inicio)),
                     "duracao_s": round(duracao, 1) if duracao else (t.get("duracao_s") or None),
                     "tempo_s": round(time.time() - inicio, 1), "modelo": self._hw.modelo,
-                    **{k: t[k] for k in ("url", "modo", "canal", "legenda") if t.get(k)},
+                    **{k: t[k] for k in ("url", "modo", "canal", "legenda", "fonte") if t.get(k)},
                     "audio_guardado": bool(t.get("audio_guardado"))}
             self.historico.gravar_meta(pasta, meta)
         self._atualizar_trabalho(forcar=True, fase=status, erro=erro, aviso=aviso, restante_s=None,
@@ -343,6 +367,127 @@ class Servico:
             shutil.copy2(caminho, pasta / ("audio" + Path(caminho).suffix))
             self._atualizar_trabalho(forcar=True, audio_guardado=True)
         return self._transcrever(str(caminho), idioma, parar, pasta)
+
+    # ---------- gravação ao vivo ----------
+    def info_gravacao(self) -> dict:
+        """O que a aba Gravar precisa saber: se funciona neste sistema e quais microfones existem."""
+        ok, motivo = self.dispositivos.suportado()
+        microfones = []
+        if ok:
+            try:
+                microfones = self.dispositivos.microfones()
+            except Exception as e:  # noqa: BLE001
+                erros.registrar(self.saidas, e)
+        return {"suportado": ok, "motivo": motivo, "microfones": microfones}
+
+    @staticmethod
+    def _validar_fonte(fonte: str) -> None:
+        if fonte not in FONTES:
+            raise ValueError("fonte de gravação desconhecida")
+
+    def _abrir_captura(self, fonte: str, microfone: str | None):
+        try:
+            return self.dispositivos.abrir(fonte, microfone or None)
+        except ErroCaptura:
+            raise
+        except Exception as e:  # noqa: BLE001
+            erros.registrar(self.saidas, e)
+            raise ErroCaptura(MSG_CAPTURA, "captura") from e
+
+    def _publicar_nivel(self, origem: str, niveis: dict) -> None:
+        self.publicar("nivel", {"origem": origem, "niveis": niveis})
+
+    def iniciar_previa(self, fonte: str, microfone: str | None = None) -> None:
+        """Liga (ou renova) o medidor de nível antes de gravar. Nada é gravado."""
+        self._validar_fonte(fonte)
+        with self._lock_previa:
+            if self._ocupado():
+                raise Ocupado(erros.MSG_OCUPADO)
+            chave = (fonte, microfone or "")
+            if self._previa and self._previa.viva and self._previa.chave == chave:
+                self._previa.renovar()
+                return
+            self._parar_previa()
+            self._previa = Previa(self._abrir_captura(fonte, microfone), self._publicar_nivel, chave)
+
+    def _parar_previa(self) -> None:
+        p, self._previa = self._previa, None
+        if p:
+            p.parar()
+
+    def parar_previa(self) -> None:
+        with self._lock_previa:
+            self._parar_previa()
+
+    def iniciar_gravacao(self, fonte: str, microfone: str | None = None) -> str:
+        self._validar_fonte(fonte)
+        with self.lock:
+            if self.estado_modelo["fase"] != "pronto" or self.modelo is None:
+                raise NaoPronto(erros.MSG_NAO_PRONTO)
+            if self._ocupado():
+                raise Ocupado(erros.MSG_OCUPADO)
+        self.parar_previa()
+        conjunto = self._abrir_captura(fonte, microfone)      # erros de microfone/som saem aqui, antes de criar a pasta
+        nome = f"Gravação de {FONTES[fonte]} {time.strftime('%d-%m-%Y %Hh%M')}"
+        try:
+            id_, pasta, parar = self._comecar("gravacao", nome, {"fonte": fonte, "audio_guardado": True})
+        except BaseException:
+            conjunto.fechar()
+            raise
+        threading.Thread(target=self._executar, daemon=True, args=(
+            id_, pasta, parar, lambda: self._fazer_gravacao(conjunto, pasta, parar), None, True)).start()
+        return id_
+
+    def _fazer_gravacao(self, conjunto, pasta: Path, parar: threading.Event) -> tuple[int, float | None]:
+        def progresso(gravado_s: float, atraso_s: float, pendentes: int) -> None:
+            self._atualizar_trabalho(fase="parando" if parar.is_set() else "gravando", gravado_s=round(gravado_s, 1),
+                                     atraso_s=round(atraso_s), atrasado=atraso_s > ATRASO_AVISO_S,
+                                     pendentes=pendentes, decorrido_s=round(gravado_s, 1))
+
+        self._atualizar_trabalho(forcar=True, fase="parando" if parar.is_set() else "gravando")
+        with open(pasta / ARQ_TEXTO, "a", encoding="utf-8") as f:
+            def erro_trecho(t0: float, exc: BaseException) -> None:
+                erros.registrar(self.saidas, exc)
+                self._registrar_linha(f, Linha(t0, "[não consegui transcrever este trecho; o áudio ficou salvo]"))
+
+            resultado = Gravacao(
+                conjunto, str(pasta), self.modelo, parar,
+                ao_linha=lambda linha: self._registrar_linha(f, linha), ao_erro=erro_trecho,
+                ao_nivel=self._publicar_nivel, ao_progresso=progresso).executar()
+        if resultado.falha:
+            self._atualizar_trabalho(forcar=True, aviso_fim=resultado.falha.mensagem)
+        self._atualizar_trabalho(forcar=True, gravado_s=round(resultado.gravado_s, 1), atraso_s=0, atrasado=False,
+                                 pendentes=0)
+        with self.lock:
+            n = len(self.linhas)
+        return n, resultado.gravado_s
+
+    # ---------- atualizar o yt-dlp (só depois de o usuário confirmar) ----------
+    def versao_ytdlp(self) -> str:
+        return self._versao_ytdlp()
+
+    def atualizar_ytdlp(self) -> dict:
+        """Instala o yt-dlp mais recente. Recusa se houver trabalho em andamento. Levanta ErroYoutube."""
+        with self.lock:
+            if self._ocupado():
+                raise Ocupado(erros.MSG_OCUPADO)
+            self._atualizando = True
+        try:
+            return self._atualizar_ytdlp()
+        except ErroYoutube as e:
+            erros.registrar(self.saidas, e)
+            raise
+        finally:
+            with self.lock:
+                self._atualizando = False
+            self._info_cache.clear()
+
+    def encerrar(self) -> None:
+        """Ao fechar o programa: desliga a prévia do microfone e pede para a gravação parar."""
+        self.parar_previa()
+        with self.lock:
+            if self.trabalho and self.trabalho["fase"] in FASES_ATIVAS:
+                self._parar.set()
 
     # ---------- texto ----------
     def texto(self, id_: str, horarios: bool = True) -> str | None:

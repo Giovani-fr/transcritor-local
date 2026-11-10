@@ -16,8 +16,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .. import config, erros
+from ..captura import DispositivosSimulados, ErroCaptura
 from ..hardware import detectar_hardware
-from ..servico import NaoPronto, Ocupado, Servico
+from ..servico import FONTES, NaoPronto, Ocupado, Servico
 from ..youtube import ErroYoutube
 
 ESTATICOS = Path(__file__).parent / "static"
@@ -33,6 +34,15 @@ class PedidoYoutube(BaseModel):
     modo: str = "rapido"
     manter_audio: bool = False
     idioma: str = "pt"
+
+
+class PedidoGravacao(BaseModel):
+    fonte: str = "reuniao"
+    microfone: str = ""
+
+
+class PedidoAtualizar(BaseModel):
+    confirmado: bool = False
 
 
 class Difusor:
@@ -55,7 +65,8 @@ def _sse(tipo: str, dados: dict) -> str:
 
 def servico_padrao() -> Servico:
     hw = lambda: detectar_hardware(config.forcar_cpu(), config.modelo_forcado(), config.cpu_threads())  # noqa: E731
-    return Servico(config.pasta_saidas(), cache_dir=config.pasta_modelos(), detectar=hw)
+    dispositivos = DispositivosSimulados() if config.captura_simulada() else None
+    return Servico(config.pasta_saidas(), cache_dir=config.pasta_modelos(), detectar=hw, dispositivos=dispositivos)
 
 
 def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
@@ -68,6 +79,7 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
         if iniciar:
             servico.iniciar()
         yield
+        servico.encerrar()
 
     app = FastAPI(title="transcritor-local", lifespan=vida)
     app.state.servico = servico
@@ -150,6 +162,61 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
         except Exception as e:
             erros.registrar(servico.saidas, e)
             raise HTTPException(500, erros.MSG_GENERICA)
+
+    # ---------- gravação ao vivo ----------
+    def _erro_captura(e: ErroCaptura) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": e.mensagem, "codigo": e.codigo})
+
+    @app.get("/api/gravacao/dispositivos")
+    def dispositivos():
+        return servico.info_gravacao()
+
+    @app.post("/api/gravacao/previa")
+    def ligar_previa(pedido: PedidoGravacao):
+        if pedido.fonte not in FONTES:
+            raise HTTPException(400, "Opção não reconhecida.")
+        try:
+            servico.iniciar_previa(pedido.fonte, pedido.microfone)
+        except ErroCaptura as e:
+            return _erro_captura(e)
+        except Ocupado as e:
+            raise HTTPException(409, str(e))
+        return {"ok": True}
+
+    @app.post("/api/gravacao/previa/parar")
+    def desligar_previa():
+        servico.parar_previa()
+        return {"ok": True}
+
+    @app.post("/api/gravacao")
+    def iniciar_gravacao(pedido: PedidoGravacao):
+        if pedido.fonte not in FONTES:
+            raise HTTPException(400, "Opção não reconhecida.")
+        try:
+            return {"id": servico.iniciar_gravacao(pedido.fonte, pedido.microfone)}
+        except ErroCaptura as e:
+            return _erro_captura(e)
+        except (Ocupado, NaoPronto) as e:
+            raise HTTPException(409, str(e))
+        except Exception as e:
+            erros.registrar(servico.saidas, e)
+            raise HTTPException(500, erros.MSG_GENERICA)
+
+    # ---------- atualizar o yt-dlp (só com confirmação explícita) ----------
+    @app.get("/api/ytdlp")
+    def versao_ytdlp():
+        return {"versao": servico.versao_ytdlp()}
+
+    @app.post("/api/ytdlp/atualizar")
+    def atualizar_ytdlp(pedido: PedidoAtualizar):
+        if not pedido.confirmado:
+            raise HTTPException(400, "Preciso da sua confirmação para atualizar o yt-dlp.")
+        try:
+            return servico.atualizar_ytdlp()
+        except ErroYoutube as e:
+            return _erro_youtube(e)
+        except Ocupado as e:
+            raise HTTPException(409, str(e))
 
     @app.post("/api/parar")
     def parar():

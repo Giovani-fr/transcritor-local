@@ -17,4 +17,6 @@ Documentação completa (funções, requisitos, instalação) será adicionada n
 - **Gravações e reuniões.** Avise e peça o consentimento das pessoas antes de gravar uma conversa ou reunião.
 - **Testes.** Os testes automáticos não usam vídeos de terceiros: usam áudio sintético e simulações. O único teste com
   internet (`pytest -m rede`, opcional) usa um vídeo da NASA, material em geral de domínio público.
+- **Vídeo dos exemplos.** O vídeo que aparece nos exemplos e nas imagens deste projeto é da **NASA Goddard** (domínio
+  público, salvo indicação em contrário).
 

@@ -5,7 +5,10 @@ Os erros viram ``ErroYoutube`` com mensagem em linguagem simples.
 """
 from __future__ import annotations
 
+import importlib
+import importlib.metadata
 import re
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -73,6 +76,60 @@ def ajuda_atualizar() -> dict:
         versao = ""
     return {"tipo": "atualizar_ytdlp", "versao": versao,
             "comando": f'"{sys.executable}" -m pip install --upgrade yt-dlp'}
+
+
+def versao_ytdlp() -> str:
+    """Versão do yt-dlp instalada agora (lida do disco, então reflete uma atualização recém-feita)."""
+    importlib.invalidate_caches()
+    try:
+        return importlib.metadata.version("yt-dlp")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+MSG_ATUALIZAR_REDE = ("Não consegui baixar a atualização. Confira sua conexão com a internet e tente de novo.")
+MSG_ATUALIZAR_FALHA = ("Não consegui atualizar o yt-dlp por aqui. Tente o jeito manual (copie o comando e rode "
+                       "no prompt de comando).")
+
+
+def _rodar_pip(comando: list[str]) -> subprocess.CompletedProcess:
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)       # não abre janela preta no Windows
+    return subprocess.run(comando, capture_output=True, text=True, timeout=300, creationflags=flags)
+
+
+def _recarregar_ytdlp() -> str:
+    """Faz o programa passar a usar o yt-dlp novo sem reiniciar. Devolve a versão carregada ('' se falhar)."""
+    for nome in [m for m in sys.modules if m == "yt_dlp" or m.startswith("yt_dlp.")]:
+        del sys.modules[nome]
+    try:
+        import yt_dlp
+        return yt_dlp.version.__version__
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def atualizar_ytdlp(rodar=_rodar_pip, versao=versao_ytdlp, recarregar=_recarregar_ytdlp) -> dict:
+    """Instala a versão mais recente do yt-dlp. Só deve ser chamado depois da confirmação do usuário.
+
+    Devolve ``{antes, depois, mudou, reiniciar}``. Levanta ErroYoutube(codigo="atualizacao").
+    """
+    antes = versao()
+    try:
+        r = rodar([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
+    except subprocess.TimeoutExpired as e:
+        raise ErroYoutube(MSG_ATUALIZAR_REDE, "atualizacao") from e
+    except Exception as e:  # noqa: BLE001
+        raise ErroYoutube(MSG_ATUALIZAR_FALHA, "atualizacao") from e
+    if r.returncode != 0:
+        saida = ((r.stderr or "") + (r.stdout or "")).lower()
+        rede = any(x in saida for x in ("connection", "timed out", "name resolution", "network", "proxy", "ssl"))
+        raise ErroYoutube(MSG_ATUALIZAR_REDE if rede else MSG_ATUALIZAR_FALHA, "atualizacao")
+    depois = versao()
+    carregada = recarregar()
+    # se não deu para recarregar sem reiniciar, o programa ainda usa a versão antiga
+    reiniciar = not carregada or (bool(depois) and carregada != depois)
+    return {"antes": antes, "depois": depois or carregada, "mudou": bool(antes and depois and antes != depois),
+            "reiniciar": reiniciar}
 
 
 def classificar_ytdlp(mensagem: str) -> ErroYoutube:

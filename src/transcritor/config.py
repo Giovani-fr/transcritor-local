@@ -25,6 +25,11 @@ def modelo_forcado() -> str | None:
     return os.environ.get("TRANSCRITOR_MODELO") or None
 
 
+def captura_simulada() -> bool:
+    """Usa sinais sintéticos no lugar do microfone (demonstração e prints; nunca grava ninguém)."""
+    return os.environ.get("TRANSCRITOR_CAPTURA_SIMULADA", "") in ("1", "true", "sim")
+
+
 def cpu_threads() -> int:
     try:
         return int(os.environ.get("TRANSCRITOR_CPU_THREADS", "0"))

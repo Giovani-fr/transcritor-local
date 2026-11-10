@@ -3,7 +3,7 @@
   "use strict";
   const $ = (s) => document.querySelector(s);
   const mostrar = (el, sim) => { el.hidden = !sim; };
-  const ATIVAS = ["preparando", "baixando", "transcrevendo", "parando"];
+  const ATIVAS = ["preparando", "baixando", "transcrevendo", "gravando", "parando"];
 
   const estado = {
     hardware: {}, modelo: { fase: "verificando" }, trabalho: null, linhas: [],
@@ -14,6 +14,7 @@
     historico: [], horarios: true,
     video: null,           // vídeo consultado na aba YouTube
     hwAberto: false,
+    grav: { info: null, erro: "", confirmando: false },   // aba Gravar
   };
   let desenhadas = 0, idDesenhado = null, primeiroSnapshot = true;
   try { estado.hwAberto = !localStorage.getItem("hwVisto"); } catch (e) { estado.hwAberto = true; }
@@ -50,12 +51,13 @@
     el.setAttribute("aria-valuenow", pct);
     return pct;
   }
+  const FONTES = { reuniao: "Reunião", ambiente: "Ambiente" };
   const IDIOMAS = { pt: "português", "pt-BR": "português", en: "inglês", es: "espanhol", fr: "francês", de: "alemão", it: "italiano" };
   const nomeIdioma = (c) => IDIOMAS[c] || IDIOMAS[(c || "").split("-")[0]] || c;
   const MODOS = { rapido: "modo Rápido", preciso: "modo Preciso" };
   function el(tag, props, ...filhos) {
     const e = document.createElement(tag);
-    Object.assign(e, props || {});
+    for (const [k, v] of Object.entries(props || {})) { if (k === "role") e.setAttribute(k, v); else e[k] = v; }
     e.append(...filhos);
     return e;
   }
@@ -103,25 +105,71 @@
       const l = estado.linhas[desenhadas];
       alvo.append(linhaEl(l.t, l.texto, l.fundo));
     }
-    if (!estado.linhas.length && !alvo.firstChild) alvo.append(el("span", { className: "vazio", textContent: "O texto vai aparecendo aqui…" }));
+    if (!estado.linhas.length && !alvo.firstChild) {
+      const grav = estado.trabalho && estado.trabalho.tipo === "gravacao";
+      alvo.append(el("span", { className: "vazio", textContent: grav ? "O texto aparece aqui a cada 30 segundos, mais ou menos…" : "O texto vai aparecendo aqui…" }));
+    }
     if (colado) alvo.scrollTop = alvo.scrollHeight;
   }
 
   /* ---------- ajuda para atualizar o yt-dlp ---------- */
+  // Nunca atualiza sozinho: o botão só pede a confirmação; a instalação começa no "Continuar".
   function criarAjuda(ajuda) {
     const cmd = el("code", { textContent: ajuda.comando });
-    const btn = el("button", { className: "btn btn-sec", type: "button", textContent: "Copiar comando" });
-    btn.addEventListener("click", () => copiar(ajuda.comando, "Comando copiado!"));
-    return el("div", { className: "ajuda" },
-      el("p", {}, el("strong", { textContent: "Como atualizar o yt-dlp" }),
-        document.createTextNode(" — o programa que baixa o áudio" + (ajuda.versao ? " (versão instalada: " + ajuda.versao + ")" : "") +
-          ". Atualizar costuma resolver.")),
+    const copia = el("button", { className: "btn btn-sec", type: "button", textContent: "Copiar comando" });
+    copia.addEventListener("click", () => copiar(ajuda.comando, "Comando copiado!"));
+
+    const atualizar = el("button", { className: "btn btn-primario", type: "button", textContent: "Atualizar yt-dlp agora" });
+    const pergunta = el("p", { textContent: "Vou instalar a versão mais recente do yt-dlp. Continuar?" });
+    const sim = el("button", { className: "btn btn-primario", type: "button", textContent: "Continuar" });
+    const nao = el("button", { className: "btn btn-sec", type: "button", textContent: "Cancelar" });
+    const botoes = el("div", { className: "acoes" }, sim, nao);
+    const confirmar = el("div", { className: "confirmar", role: "alertdialog" }, pergunta, botoes);
+    confirmar.hidden = true;
+    const resultado = el("p", { className: "ajuda-resultado", role: "status" });
+    resultado.hidden = true;
+
+    const mostrarResultado = (falha, ...filhos) => {
+      resultado.className = "ajuda-resultado" + (falha ? " falha" : "");
+      resultado.replaceChildren(...filhos); resultado.hidden = false;
+    };
+    atualizar.addEventListener("click", () => { atualizar.hidden = true; resultado.hidden = true; confirmar.hidden = false; nao.focus(); });
+    nao.addEventListener("click", () => { confirmar.hidden = true; atualizar.hidden = false; atualizar.focus(); });
+    sim.addEventListener("click", async () => {
+      botoes.hidden = true;
+      pergunta.textContent = "Atualizando o yt-dlp… isso pode levar até um minuto.";
+      try {
+        const r = await fetch("/api/ytdlp/atualizar", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmado: true }) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Não consegui atualizar agora.");
+        const versoes = "Versão antes: " + (d.antes || "desconhecida") + " · depois: " + (d.depois || "desconhecida");
+        const linhas = [el("span", { textContent: d.mudou ? "yt-dlp atualizado! Agora é só tentar de novo." : "Você já estava com a versão mais recente." }),
+          el("small", { textContent: versoes })];
+        if (d.reiniciar) linhas.push(el("small", { textContent: "Para valer a atualização, feche a janela preta e abra o iniciar.bat de novo." }));
+        mostrarResultado(false, ...linhas);
+        confirmar.hidden = true;           // deu certo: não oferece atualizar outra vez
+      } catch (e) {
+        const msg = e instanceof TypeError ? "Não consegui falar com o programa. Confira se a janela preta ainda está aberta." : e.message;
+        mostrarResultado(true, document.createTextNode(msg));
+        confirmar.hidden = true; atualizar.hidden = false; atualizar.textContent = "Tentar de novo";
+      } finally { botoes.hidden = false; pergunta.textContent = "Vou instalar a versão mais recente do yt-dlp. Continuar?"; }
+    });
+
+    const manual = el("details", { className: "manual" },
+      el("summary", { textContent: "Prefere atualizar manualmente?" }),
       el("ol", {},
         el("li", { textContent: "Feche a janela preta do programa." }),
         el("li", {}, document.createTextNode("Aperte a tecla Windows, digite "), el("strong", { textContent: "cmd" }), document.createTextNode(" e tecle Enter.")),
         el("li", { textContent: "Cole o comando abaixo e tecle Enter:" })),
-      el("div", { className: "comando" }, cmd, btn),
+      el("div", { className: "comando" }, cmd, copia),
       el("p", {}, document.createTextNode("Depois abra o "), el("strong", { textContent: "iniciar.bat" }), document.createTextNode(" de novo e tente outra vez.")));
+
+    return el("div", { className: "ajuda" },
+      el("p", {}, el("strong", { textContent: "Atualizar o yt-dlp" }),
+        document.createTextNode(" — o programa que baixa o áudio" + (ajuda.versao ? " (versão instalada: " + ajuda.versao + ")" : "") +
+          ". Atualizar costuma resolver.")),
+      atualizar, confirmar, resultado, manual);
   }
 
   /* ---------- telas ---------- */
@@ -166,12 +214,15 @@
       if (ativa) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     }
   }
+  function gravandoAgora() { return !!(estado.trabalho && estado.trabalho.tipo === "gravacao" && ATIVAS.includes(estado.trabalho.fase)); }
   function trabalhoAtivo() { return !!(estado.enviando || (estado.trabalho && ATIVAS.includes(estado.trabalho.fase))); }
   for (const b of document.querySelectorAll(".aba[data-aba]")) {
     b.addEventListener("click", () => {
-      if (trabalhoAtivo()) { aviso("Tem uma transcrição em andamento. Espere terminar ou clique em Parar."); return; }
+      if (trabalhoAtivo()) { aviso(gravandoAgora() ? "Tem uma gravação em andamento. Clique em Parar gravação para terminar." : "Tem uma transcrição em andamento. Espere terminar ou clique em Parar."); return; }
       estado.aba = b.dataset.aba; estado.visualizando = null; estado.dispensado = estado.trabalho ? estado.trabalho.id : null;
+      estado.grav.confirmando = false;
       render();
+      if (estado.aba === "gravar") carregarDispositivos();
     });
   }
 
@@ -188,15 +239,20 @@
     const etapa = etapaPainel();
     mostrar($("#inicio-arquivo"), etapa === "inicio" && estado.aba === "arquivo");
     mostrar($("#inicio-youtube"), etapa === "inicio" && estado.aba === "youtube");
+    mostrar($("#inicio-gravar"), etapa === "inicio" && estado.aba === "gravar");
     mostrar($("#arq-andamento"), etapa === "andamento");
     mostrar($("#arq-fim"), etapa === "fim");
     if (etapa === "andamento") renderAndamento();
     if (etapa === "fim") renderFim();
+    if (etapa === "inicio" && estado.aba === "gravar") renderGravar();
+    sincronizarPrevia();
   }
   function renderAndamento() {
     const t = estado.trabalho, env = estado.enviando;
     const btn = $("#btn-parar");
     if (env) {
+      mostrar($("#grav-extra"), false); $("#and-nome").hidden = false; $("#barra-job").hidden = false; $("#linha-status").hidden = false;
+      btn.textContent = "Parar"; btn.classList.remove("btn-grande");
       $("#and-tipo").textContent = "Arquivo";
       $("#and-nome").textContent = env.nome;
       $("#barra-job").classList.remove("indeterminada");
@@ -206,6 +262,12 @@
       btn.disabled = true;
       return;
     }
+    const grav = t.tipo === "gravacao";
+    mostrar($("#grav-extra"), grav);
+    $("#and-nome").hidden = grav; $("#barra-job").hidden = grav; $("#linha-status").hidden = grav;
+    btn.textContent = grav ? "Parar gravação" : "Parar";
+    btn.classList.toggle("btn-grande", grav);
+    if (grav) { renderGravando(t); btn.disabled = t.fase === "parando"; desenharAoVivo(); return; }
     const yt = t.tipo === "youtube";
     $("#and-tipo").textContent = yt ? "YouTube · " + MODOS[t.modo] : "Arquivo";
     $("#and-nome").textContent = t.nome;
@@ -230,11 +292,12 @@
   async function renderFim() {
     const v = estado.visualizando;
     const t = v ? { id: v.id, nome: v.nome, fase: v.status, erro: "", aviso: "", tipo: v.tipo, url: v.url, modo: v.modo,
-                    canal: v.canal, legenda: v.legenda, audio_guardado: v.audio_guardado, codigo_erro: "", ajuda: null }
+                    canal: v.canal, legenda: v.legenda, audio_guardado: v.audio_guardado, codigo_erro: "", ajuda: null,
+                    fonte: v.fonte }
                 : estado.trabalho;
     if (!t) return;
     const meta = estado.historico.find((h) => h.id === t.id) || {};
-    const yt = t.tipo === "youtube";
+    const yt = t.tipo === "youtube", gr = t.tipo === "gravacao";
     $("#fim-nome").textContent = t.nome;
     const selo = $("#fim-selo");
     const rotulos = { concluido: "Pronto ✓", parado: "Parado", erro: "Não deu certo", interrompido: "Interrompido" };
@@ -247,8 +310,9 @@
       const m = t.modo || meta.modo, leg = t.legenda || meta.legenda;
       partes.push(MODOS[m] + (m === "rapido" && leg ? " · legenda em " + nomeIdioma(leg.split(" ")[0]) + (leg.includes("automática") ? " (automática)" : "") : ""));
     }
-    if (meta.duracao_s) partes.push((yt ? "vídeo" : "áudio") + " de " + duracao(meta.duracao_s));
-    if (meta.tempo_s && t.fase === "concluido" && !(yt && (t.modo || meta.modo) === "rapido")) partes.push("transcrito em " + duracao(meta.tempo_s));
+    if (gr && (t.fonte || meta.fonte)) partes.push("modo " + (FONTES[t.fonte || meta.fonte] || ""));
+    if (meta.duracao_s) partes.push((yt ? "vídeo" : gr ? "gravação" : "áudio") + " de " + duracao(meta.duracao_s));
+    if (meta.tempo_s && t.fase === "concluido" && !gr && !(yt && (t.modo || meta.modo) === "rapido")) partes.push("transcrito em " + duracao(meta.tempo_s));
     if (meta.modelo && !(yt && (t.modo || meta.modo) === "rapido")) partes.push("modelo " + meta.modelo.replace(/-/g, "‑"));
     if (t.audio_guardado || meta.audio_guardado) partes.push("áudio guardado na pasta");
     $("#fim-meta").textContent = partes.join(" · ");
@@ -259,14 +323,18 @@
     av.textContent = t.aviso || ""; mostrar(av, !!t.aviso);
     er.textContent = t.erro || ""; mostrar(er, !!t.erro);
     const ajuda = $("#fim-ajuda");
-    ajuda.replaceChildren();
-    if (t.ajuda && t.ajuda.tipo === "atualizar_ytdlp") ajuda.append(criarAjuda(t.ajuda));
+    const assinatura = t.ajuda && t.ajuda.tipo === "atualizar_ytdlp" ? t.id + ":" + t.codigo_erro : "";
+    if (ajuda.dataset.assinatura !== assinatura) {      // só refaz quando muda, para não apagar o que o usuário está fazendo
+      ajuda.replaceChildren(); ajuda.dataset.assinatura = assinatura;
+      if (assinatura) ajuda.append(criarAjuda(t.ajuda));
+    }
     mostrar(ajuda, ajuda.childElementCount > 0);
     mostrar($("#fim-acao-preciso"), t.codigo_erro === "sem_legenda" && !!t.url);
     const temTexto = !!(meta.linhas || (!v && estado.linhas.length));
     mostrar($("#fim-texto-bloco"), temTexto);
     $("#btn-pasta").hidden = !temTexto;
-    $("#btn-outro").textContent = yt ? "Transcrever outro vídeo" : "Transcrever outro arquivo";
+    mostrar($("#fim-acao-pasta"), gr && !temTexto && !!(t.audio_guardado || meta.audio_guardado));
+    $("#btn-outro").textContent = yt ? "Transcrever outro vídeo" : gr ? "Fazer outra gravação" : "Transcrever outro arquivo";
     if (temTexto) await carregarTextoFinal(t.id);
   }
   let tokenTexto = 0;
@@ -291,11 +359,11 @@
     } catch (e) { return; }
     const ul = $("#lista-historico"); ul.replaceChildren();
     for (const h of estado.historico) {
-      const info = [dataBonita(h.criado), h.tipo === "youtube" ? "YouTube" + (h.modo ? " " + (h.modo === "rapido" ? "Rápido" : "Preciso") : "") : "", h.duracao_s ? duracao(h.duracao_s) : "", STATUS[h.status] || ""];
+      const info = [dataBonita(h.criado), h.tipo === "youtube" ? "YouTube" + (h.modo ? " " + (h.modo === "rapido" ? "Rápido" : "Preciso") : "") : h.tipo === "gravacao" ? "Gravação" + (h.fonte ? " · " + FONTES[h.fonte] : "") : "", h.duracao_s ? duracao(h.duracao_s) : "", STATUS[h.status] || ""];
       const b = el("button", { type: "button", className: "item" },
         el("strong", { textContent: h.nome }), el("span", { className: "miudo", textContent: info.filter(Boolean).join(" · ") }));
       b.addEventListener("click", () => {
-        if (trabalhoAtivo()) { aviso("Espere a transcrição terminar ou clique em Parar."); return; }
+        if (trabalhoAtivo()) { aviso(gravandoAgora() ? "Clique em Parar gravação antes de abrir outra transcrição." : "Espere a transcrição terminar ou clique em Parar."); return; }
         estado.visualizando = h; render(); window.scrollTo({ top: 0, behavior: "smooth" });
       });
       ul.append(el("li", {}, b));
@@ -314,7 +382,7 @@
       Object.assign(estado, { hardware: d.hardware, modelo: d.modelo, trabalho: d.trabalho, linhas: d.linhas });
       // ao abrir a página, começa na tela inicial; um resultado antigo fica no histórico
       if (primeiroSnapshot && d.trabalho && !ATIVAS.includes(d.trabalho.fase)) estado.dispensado = d.trabalho.id;
-      if (primeiroSnapshot && d.trabalho && ATIVAS.includes(d.trabalho.fase)) estado.aba = d.trabalho.tipo === "youtube" ? "youtube" : "arquivo";
+      if (primeiroSnapshot && d.trabalho && ATIVAS.includes(d.trabalho.fase)) estado.aba = d.trabalho.tipo === "youtube" ? "youtube" : d.trabalho.tipo === "gravacao" ? "gravar" : "arquivo";
       primeiroSnapshot = false;
       render(); carregarHistorico();
     });
@@ -325,11 +393,13 @@
       if (d.trabalho && (!antes || antes.id !== d.trabalho.id)) {
         estado.linhas = []; estado.enviando = null; estado.visualizando = null;
         if (d.trabalho.tipo === "youtube") { estado.aba = "youtube"; reiniciarYoutube(); }
+        if (d.trabalho.tipo === "gravacao") { estado.aba = "gravar"; estado.grav.confirmando = false; }
       }
       render();
     });
     es.addEventListener("linha", (e) => { estado.linhas.push(JSON.parse(e.data)); if (etapaPainel() === "andamento") desenharAoVivo(); });
     es.addEventListener("historico", carregarHistorico);
+    es.addEventListener("nivel", (e) => pintarNiveis(JSON.parse(e.data).niveis));
   }
 
   /* ---------- ações comuns ---------- */
@@ -338,9 +408,10 @@
   $("#btn-tentar-modelo").addEventListener("click", () => post("/api/modelo/baixar"));
   $("#btn-parar").addEventListener("click", () => { $("#btn-parar").disabled = true; post("/api/parar"); });
   $("#btn-outro").addEventListener("click", () => {
-    const eraYt = (estado.visualizando ? estado.visualizando.tipo : (estado.trabalho && estado.trabalho.tipo)) === "youtube";
+    const tipo = estado.visualizando ? estado.visualizando.tipo : (estado.trabalho && estado.trabalho.tipo);
     estado.dispensado = estado.trabalho ? estado.trabalho.id : null; estado.visualizando = null; estado.horarios = true;
-    estado.aba = eraYt ? "youtube" : estado.aba;
+    estado.aba = tipo === "youtube" ? "youtube" : tipo === "gravacao" ? "gravar" : estado.aba;
+    if (estado.aba === "gravar") carregarDispositivos();
     $("#chk-horarios").checked = true; render();
   });
   $("#chk-horarios").addEventListener("change", (e) => { estado.horarios = e.target.checked; carregarTextoFinal(idAtual()); });
@@ -356,6 +427,7 @@
     document.body.append(a); a.click(); a.remove();
   });
   $("#btn-pasta").addEventListener("click", () => post("/api/historico/" + encodeURIComponent(idAtual()) + "/abrir-pasta"));
+  $("#btn-fim-pasta").addEventListener("click", () => post("/api/historico/" + encodeURIComponent(idAtual()) + "/abrir-pasta"));
 
   /* ---------- aba Arquivo: envio (XHR para mostrar o progresso do envio) ---------- */
   function enviar(arquivo) {
@@ -467,5 +539,174 @@
     const y = localStorage.getItem("ytIdioma"); if (y) $("#yt-idioma").value = y;
   } catch (e) { /* ok */ }
   $("#yt-idioma").addEventListener("change", (e) => { try { localStorage.setItem("ytIdioma", e.target.value); } catch (x) { /* ok */ } });
+  /* ---------- aba Gravar ---------- */
+  const NOMES_MEDIDOR = { mic: "Seu microfone", sistema: "Som do computador" };
+  const AVISOS_MEDIDOR = {
+    mic: { baixo: "O som está muito baixo. Chegue mais perto do microfone ou aumente o volume dele.",
+           mudo: "Não estou ouvindo nada pelo microfone. Confira se ele está ligado e se é o escolhido em Avançado." },
+    sistema: { baixo: "O som do computador está muito baixo. Aumente o volume da reunião.",
+               mudo: "Nenhum som saindo do computador agora." },
+  };
+  const fonteAtual = () => document.querySelector('input[name="grav-fonte"]:checked').value;
+  const chavesDaFonte = (f) => f === "reuniao" ? ["mic", "sistema"] : ["mic"];
+  const micAtual = () => $("#grav-mic").value;
+
+  function montarMedidores(alvo, chaves) {
+    if (Array.from(alvo.children).map((c) => c.dataset.chave).join() === chaves.join()) return;
+    alvo.replaceChildren(...chaves.map((k) => {
+      const nivel = el("div", { className: "med-nivel" });
+      const barra = el("div", { className: "med-barra", role: "meter" }, nivel);
+      barra.setAttribute("aria-label", NOMES_MEDIDOR[k]);
+      barra.setAttribute("aria-valuemin", "0"); barra.setAttribute("aria-valuemax", "100"); barra.setAttribute("aria-valuenow", "0");
+      const aviso = el("p", { className: "med-aviso" }); aviso.hidden = true;
+      const m = el("div", { className: "medidor" }, el("div", { className: "med-topo" }, el("span", { textContent: NOMES_MEDIDOR[k] })), barra, aviso);
+      m.dataset.chave = k;
+      return m;
+    }));
+  }
+  function pintarNiveis(niveis) {
+    for (const [chave, v] of Object.entries(niveis || {})) {
+      for (const m of document.querySelectorAll('.medidor[data-chave="' + chave + '"]')) {
+        const pct = Math.round(v.n * 100);
+        m.querySelector(".med-nivel").style.width = pct + "%";
+        m.querySelector(".med-barra").setAttribute("aria-valuenow", pct);
+        if (m.dataset.aviso !== v.aviso) {
+          m.dataset.aviso = v.aviso;
+          const a = m.querySelector(".med-aviso"), texto = v.aviso ? AVISOS_MEDIDOR[chave][v.aviso] : "";
+          a.textContent = texto; a.hidden = !texto;
+          a.className = "med-aviso" + (v.aviso && !(chave === "sistema" && v.aviso === "mudo") ? " alerta" : "");
+        }
+      }
+    }
+  }
+  function renderGravando(t) {
+    const parando = t.fase === "parando";
+    $("#and-tipo").textContent = "Gravação · " + (FONTES[t.fonte] || "");
+    $(".grav-topo").classList.toggle("parando", parando);
+    $("#grav-estado").textContent = parando
+      ? "Terminando a transcrição…" + (t.pendentes ? " (faltam " + t.pendentes + (t.pendentes === 1 ? " trecho)" : " trechos)") : "")
+      : "Gravando";
+    $("#grav-tempo").textContent = tempoRelogio(t.gravado_s);
+    mostrar($("#med-grav"), !parando);
+    montarMedidores($("#med-grav"), chavesDaFonte(t.fonte));
+    const at = $("#grav-atraso");
+    at.textContent = "A transcrição está cerca de " + duracao(t.atraso_s) + " atrás da gravação: o computador está demorando para acompanhar. " +
+      "O áudio continua sendo gravado e o texto alcança depois.";
+    mostrar(at, !!t.atrasado && !parando);
+  }
+  function tempoRelogio(s) {
+    s = Math.floor(s || 0);
+    return String(Math.floor(s / 3600)).padStart(2, "0") + ":" + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  function renderGravar() {
+    const info = estado.grav.info;
+    const sup = !info || info.suportado;
+    const ind = $("#grav-indisponivel");
+    ind.textContent = info && !info.suportado ? info.motivo : ""; mostrar(ind, !!(info && !info.suportado));
+    mostrar($("#grav-ok"), sup);
+    montarMedidores($("#med-previa"), chavesDaFonte(fonteAtual()));
+    const e = $("#grav-erro");
+    e.textContent = estado.grav.erro; mostrar(e, !!estado.grav.erro);
+    mostrar($("#grav-aviso-reuniao"), estado.grav.confirmando);
+    mostrar($("#btn-gravar-iniciar"), !estado.grav.confirmando);
+  }
+  function preencherMicrofones(info) {
+    const sel = $("#grav-mic");
+    const lista = (info && info.microfones) || [];
+    const assinatura = JSON.stringify(lista);
+    if (sel.dataset.assinatura === assinatura) return;
+    sel.dataset.assinatura = assinatura;
+    let guardado = "";
+    try { guardado = localStorage.getItem("gravMic") || ""; } catch (e) { /* ok */ }
+    sel.replaceChildren(el("option", { value: "", textContent: "Microfone padrão do Windows" }),
+      ...lista.map((m) => el("option", { value: m.id, textContent: m.nome + (m.padrao ? " (padrão)" : "") })));
+    sel.value = lista.some((m) => m.id === guardado) ? guardado : "";
+  }
+  async function carregarDispositivos() {
+    try {
+      const r = await fetch("/api/gravacao/dispositivos");
+      estado.grav.info = await r.json();
+    } catch (e) { return; }
+    preencherMicrofones(estado.grav.info);
+    render();
+  }
+
+  // Prévia do medidor: liga quando a aba Gravar está parada e visível; a página a renova a cada 5 s
+  // (o programa desliga sozinho se ela parar de renovar) e ela só mede: nada é gravado.
+  const previa = { chave: "", timer: null };
+  function previaDesejada() {
+    const i = estado.grav.info;
+    return estado.aba === "gravar" && estado.modelo.fase === "pronto" && etapaPainel() === "inicio" &&
+      !!(i && i.suportado) && document.visibilityState === "visible";
+  }
+  async function ligarPrevia() {
+    const chave = previa.chave;
+    if (!chave) return;
+    try {
+      const r = await fetch("/api/gravacao/previa", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fonte: fonteAtual(), microfone: micAtual() }) });
+      if (chave !== previa.chave) return;
+      if (r.ok) { if (estado.grav.erro) { estado.grav.erro = ""; renderGravar(); } return; }
+      const d = await r.json();
+      if (r.status === 409) return;
+      estado.grav.erro = d.detail || "Não consegui ligar o microfone."; renderGravar();
+      pintarNiveis(Object.fromEntries(chavesDaFonte(fonteAtual()).map((k) => [k, { n: 0, aviso: "" }])));
+      carregarDispositivos();           // quem conectou o microfone agora aparece na lista
+    } catch (e) { /* o aviso de conexão cuida disso */ }
+  }
+  function sincronizarPrevia() {
+    const quer = previaDesejada();
+    const chave = quer ? fonteAtual() + "|" + micAtual() : "";
+    if (chave === previa.chave) return;
+    const estavaLigada = !!previa.chave;
+    previa.chave = chave;
+    if (!chave) {
+      clearInterval(previa.timer); previa.timer = null;
+      if (estavaLigada) post("/api/gravacao/previa/parar");
+      return;
+    }
+    estado.grav.erro = "";
+    ligarPrevia();
+    if (!previa.timer) previa.timer = setInterval(ligarPrevia, 5000);
+  }
+  document.addEventListener("visibilitychange", render);
+  window.addEventListener("pagehide", () => { if (previa.chave) navigator.sendBeacon("/api/gravacao/previa/parar"); });
+
+  async function iniciarGravacao() {
+    const botao = $("#btn-gravar-iniciar");
+    estado.grav.confirmando = false; estado.grav.erro = "";
+    botao.disabled = true;
+    try {
+      try { localStorage.setItem("gravFonte", fonteAtual()); localStorage.setItem("gravMic", micAtual()); } catch (e) { /* ok */ }
+      const r = await fetch("/api/gravacao", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fonte: fonteAtual(), microfone: micAtual() }) });
+      if (r.ok) { estado.dispensado = null; return; }
+      const d = await r.json();
+      if (r.status === 409) aviso(d.detail); else estado.grav.erro = d.detail || "Não consegui começar a gravar.";
+    } catch (e) {
+      estado.grav.erro = "Não consegui falar com o programa. Confira se a janela preta ainda está aberta.";
+    } finally { botao.disabled = false; render(); }
+  }
+  $("#btn-gravar-iniciar").addEventListener("click", () => {
+    if (fonteAtual() === "reuniao") { estado.grav.confirmando = true; render(); $("#btn-grav-confirmar").focus(); }
+    else iniciarGravacao();
+  });
+  $("#btn-grav-confirmar").addEventListener("click", iniciarGravacao);
+  $("#btn-grav-voltar").addEventListener("click", () => { estado.grav.confirmando = false; render(); $("#btn-gravar-iniciar").focus(); });
+  for (const r of document.querySelectorAll('input[name="grav-fonte"]')) {
+    r.addEventListener("change", () => {
+      estado.grav.confirmando = false;
+      try { localStorage.setItem("gravFonte", fonteAtual()); } catch (e) { /* ok */ }
+      render();
+    });
+  }
+  $("#grav-mic").addEventListener("change", () => { try { localStorage.setItem("gravMic", micAtual()); } catch (e) { /* ok */ } render(); });
+  try {
+    const f = localStorage.getItem("gravFonte");
+    if (f) { const r = document.querySelector('input[name="grav-fonte"][value="' + f + '"]'); if (r) r.checked = true; }
+  } catch (e) { /* ok */ }
+
   conectar();
+  carregarDispositivos();
 })();

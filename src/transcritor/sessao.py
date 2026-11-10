@@ -8,35 +8,64 @@ from typing import Callable
 import numpy as np
 
 from .filtros import DetectorFundo
-from .motor import formatar_tempo, processar_trecho
+from .motor import TARGET_SR, Linha, formatar_tempo, processar_trecho
 
 
 class TrabalhadorTranscricao:
-    """Recebe trechos de áudio, transcreve em uma thread e entrega linhas de texto.
+    """Recebe trechos de áudio, transcreve em uma thread e entrega as linhas de texto.
 
-    Qualquer exceção em um trecho vira uma linha de erro no texto (o áudio continua
-    salvo no .wav) e a thread segue para o próximo trecho.
+    Qualquer exceção em um trecho vira um aviso no texto (o áudio continua salvo no .wav)
+    e a thread segue para o próximo trecho.
+
+    Por padrão entrega texto pronto por ``ao_receber_linha``. Quem precisa de mais controle
+    passa ``ao_linha`` (recebe a ``Linha``, com a marca de fundo), ``ao_erro`` (recebe o
+    horário e a exceção) e ``ao_concluir`` (horário e duração de cada trecho já processado).
     """
 
-    def __init__(self, modelo, ao_receber_linha: Callable[[str], None],
-                 processar: Callable = processar_trecho):
+    def __init__(self, modelo, ao_receber_linha: Callable[[str], None] | None = None,
+                 processar: Callable = processar_trecho, *,
+                 ao_linha: Callable[[Linha], None] | None = None,
+                 ao_erro: Callable[[float, BaseException], None] | None = None,
+                 ao_concluir: Callable[[float, float], None] | None = None):
         self.modelo = modelo
-        self.saida = ao_receber_linha
+        self.saida = ao_receber_linha or (lambda texto: None)
+        self.ao_linha, self.ao_erro, self.ao_concluir = ao_linha, ao_erro, ao_concluir
         self.processar = processar
         self.fila: queue.Queue = queue.Queue()
         self.detector = DetectorFundo()
         self.thread = threading.Thread(target=self._rodar, daemon=True)
+        self._pendentes = 0
+        self._lock = threading.Lock()
+
+    @property
+    def pendentes(self) -> int:
+        """Trechos que ainda não terminaram (inclui o que está sendo transcrito agora)."""
+        with self._lock:
+            return self._pendentes
+
+    @property
+    def vivo(self) -> bool:
+        return self.thread.is_alive()
 
     def iniciar(self) -> None:
         self.thread.start()
 
     def enviar(self, t0: float, audio: np.ndarray) -> None:
+        with self._lock:
+            self._pendentes += 1
         self.fila.put((t0, audio))
+
+    def encerrar(self) -> None:
+        """Avisa que não vêm mais trechos; a thread termina o que falta e para."""
+        self.fila.put(None)
+
+    def esperar(self, timeout: float | None = None) -> None:
+        self.thread.join(timeout)
 
     def finalizar(self, timeout: float | None = None) -> None:
         """Espera terminar o que falta e encerra a thread."""
-        self.fila.put(None)
-        self.thread.join(timeout)
+        self.encerrar()
+        self.esperar(timeout)
 
     def _rodar(self) -> None:
         while True:
@@ -46,7 +75,24 @@ class TrabalhadorTranscricao:
             t0, audio = item
             try:
                 for linha in self.processar(self.modelo, audio, t0, self.detector):
-                    self.saida(str(linha))
+                    if self.ao_linha:
+                        self.ao_linha(linha)
+                    else:
+                        self.saida(str(linha))
             except Exception as e:  # noqa: BLE001 - a thread não pode morrer
-                self.saida(f"[{formatar_tempo(t0)}] [ERRO na transcrição deste trecho: {e!r}] "
-                           "(o áudio continua salvo)")
+                try:
+                    if self.ao_erro:
+                        self.ao_erro(t0, e)
+                    else:
+                        self.saida(f"[{formatar_tempo(t0)}] [ERRO na transcrição deste trecho: {e!r}] "
+                                   "(o áudio continua salvo)")
+                except Exception:  # noqa: BLE001
+                    pass
+            finally:
+                with self._lock:
+                    self._pendentes -= 1
+                if self.ao_concluir:
+                    try:
+                        self.ao_concluir(t0, len(audio) / TARGET_SR)
+                    except Exception:  # noqa: BLE001
+                        pass

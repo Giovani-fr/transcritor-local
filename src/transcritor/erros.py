@@ -5,6 +5,7 @@ import logging
 import traceback
 from pathlib import Path
 
+from .captura import ErroCaptura
 from .motor import ArquivoIlegivel
 from .youtube import ErroYoutube
 
@@ -33,7 +34,7 @@ def registrar(pasta_saidas: Path, exc: BaseException) -> None:
 
 
 def traduzir_erro(exc: BaseException) -> str:
-    if isinstance(exc, ErroYoutube):
+    if isinstance(exc, (ErroYoutube, ErroCaptura)):
         return exc.mensagem
     if isinstance(exc, ArquivoIlegivel):
         return MSG_ARQUIVO

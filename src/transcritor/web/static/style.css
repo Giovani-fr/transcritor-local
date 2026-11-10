@@ -237,3 +237,42 @@ h2 { font-size: 1.3rem; line-height: 1.3; }
   .linha-link { flex-direction: column; }
   .modos { grid-template-columns: 1fr; }
 }
+
+/* Atualizar o yt-dlp (botão + confirmação + modo manual) */
+.ajuda .btn-primario { width: fit-content; }
+.confirmar { display: grid; gap: 12px; }
+.confirmar p { margin: 0; }
+.ajuda .confirmar { padding: 12px 14px; border-radius: 12px; background: var(--fundo); border: 1px solid var(--borda); }
+.ajuda-resultado { padding: 10px 14px; border-radius: 12px; background: var(--ok-fundo); color: var(--ok); font-weight: 600; }
+.ajuda-resultado.falha { background: var(--erro-fundo); color: var(--erro); }
+.ajuda-resultado small { display: block; font-weight: 400; margin-top: 2px; }
+.manual { border-top: 1px solid var(--borda); padding-top: 10px; display: grid; gap: 10px; }
+.manual summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+.manual[open] summary { margin-bottom: 10px; }
+
+/* Aba Gravar */
+#inicio-gravar, #grav-ok { display: grid; gap: 16px; }
+#inicio-gravar[hidden], #grav-ok[hidden] { display: none; }
+.bloco-nivel { display: grid; gap: 10px; }
+.medidores { display: grid; gap: 14px; }
+.medidor { display: grid; gap: 6px; }
+.med-topo { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; font-weight: 600; }
+.med-barra { height: 18px; border-radius: 99px; background: var(--destaque-fraco); overflow: hidden; border: 1px solid var(--borda); }
+.med-nivel { height: 100%; width: 0; border-radius: 99px; background: var(--ok); transition: width .12s linear, background .2s; }
+.medidor[data-aviso="baixo"] .med-nivel, .medidor[data-aviso="mudo"] .med-nivel { background: var(--aviso-borda); }
+.med-aviso { margin: 0; font-size: .92rem; line-height: 1.4; color: var(--suave); }
+.med-aviso.alerta {
+  border: 1px solid var(--aviso-borda); background: var(--aviso-fundo); color: var(--aviso);
+  border-radius: 12px; padding: 10px 14px; font-weight: 600;
+}
+.btn-grande { min-height: 76px; font-size: 1.25rem; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 12px; }
+.ponto-rec { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--erro); display: inline-block; }
+.btn-primario .ponto-rec { background: var(--sobre-destaque); }
+#grav-extra { display: grid; gap: 14px; }
+.grav-topo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.grav-topo .ponto-rec { animation: pulsa 1.4s ease-in-out infinite; }
+.grav-topo.parando .ponto-rec { animation: none; opacity: .4; }
+.grav-tempo { margin-left: auto; font: 700 2rem/1 ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; }
+@keyframes pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .grav-topo .ponto-rec { animation: none; } .med-nivel { transition: none; } }
+#btn-parar.btn-grande { width: 100%; }

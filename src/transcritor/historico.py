@@ -56,8 +56,9 @@ class Historico:
                 continue
             if meta.get("status") == "erro":
                 continue                        # erros ficam só no registro.log
-            if meta.get("status") == "em_andamento" and not (p / ARQ_TEXTO).exists():
-                continue
+            if (meta.get("status") == "em_andamento" and not (p / ARQ_TEXTO).exists()
+                    and meta.get("tipo") != "gravacao"):
+                continue                        # (gravação interrompida sempre aparece: o áudio fica salvo)
             if meta.get("status") == "em_andamento":
                 meta["status"] = "interrompido"     # o programa foi fechado no meio
             itens.append({**meta, "id": p.name})
