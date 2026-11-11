@@ -96,3 +96,27 @@ def test_usar_processador_sem_placa_nao_muda_o_aviso(monkeypatch):
     _hw(monkeypatch, "", cuda=False)
     hw = detectar_hardware(usar_processador=True)
     assert not hw.escolha_cpu and hw.aviso.startswith("Não encontrei uma placa")
+
+
+def test_placa_vista_pelo_driver_mas_sem_cublas_nao_conta_como_cuda(monkeypatch):
+    """Cenário real: venv só com requirements.txt. O ctranslate2 já 'enxerga' a placa, mas a cuBLAS falta."""
+    import types
+    monkeypatch.setitem(__import__("sys").modules, "ctranslate2", types.SimpleNamespace(get_cuda_device_count=lambda: 1))
+    monkeypatch.setattr(hardware, "preparar_cuda", lambda: None)
+    monkeypatch.setattr(hardware, "_bibliotecas_cuda_ok", lambda: False)
+    assert hardware._cuda_disponivel() is False
+    monkeypatch.setattr(hardware, "_bibliotecas_cuda_ok", lambda: True)
+    assert hardware._cuda_disponivel() is True
+
+
+def test_bibliotecas_cuda_conferidas_de_verdade(monkeypatch):
+    import ctypes
+    carregadas = []
+    monkeypatch.setattr(hardware.sys, "platform", "win32")
+    monkeypatch.setattr(ctypes, "WinDLL", lambda nome: carregadas.append(nome), raising=False)
+    assert hardware._bibliotecas_cuda_ok() and carregadas == ["cublas64_12.dll", "cudnn64_9.dll"]
+
+    def falha(nome):
+        raise OSError(nome)
+    monkeypatch.setattr(ctypes, "WinDLL", falha, raising=False)
+    assert not hardware._bibliotecas_cuda_ok()

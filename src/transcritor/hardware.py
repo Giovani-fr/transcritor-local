@@ -5,6 +5,7 @@ import ctypes
 import os
 import site
 import subprocess
+import sys
 from dataclasses import dataclass
 
 MODELO_GPU = "large-v3-turbo"
@@ -70,11 +71,27 @@ def ram_total_gb() -> float:
         return 0.0
 
 
+def _bibliotecas_cuda_ok() -> bool:
+    """As DLLs que o faster-whisper precisa na placa (cuBLAS e cuDNN) carregam?
+
+    O ctranslate2 enxerga a placa (``get_cuda_device_count``) só pelo driver, mesmo sem essas bibliotecas;
+    aí o modelo falharia na hora de carregar. Por isso conferimos as DLLs de verdade.
+    """
+    if sys.platform != "win32":
+        return True
+    for dll in ("cublas64_12.dll", "cudnn64_9.dll"):
+        try:
+            ctypes.WinDLL(dll)
+        except OSError:
+            return False
+    return True
+
+
 def _cuda_disponivel() -> bool:
     try:
         preparar_cuda()
         import ctranslate2
-        return ctranslate2.get_cuda_device_count() > 0
+        return ctranslate2.get_cuda_device_count() > 0 and _bibliotecas_cuda_ok()
     except Exception:
         return False
 
