@@ -48,7 +48,24 @@ def test_falha_na_gpu_cai_para_cpu(monkeypatch):
     gpu = Hardware(True, "large-v3-turbo", "cuda", "int8_float16")
     modelo, hw = motor.carregar_modelo(gpu)
     assert modelo == "modelo-cpu" and not hw.usa_gpu and hw.aviso
-    assert usados == [("large-v3-turbo", "cuda"), ("small", "cpu")]
+    assert list(dict.fromkeys(usados)) == [("large-v3-turbo", "cuda"), ("small", "cpu")]      # sem repetir tentativas iguais
+
+
+def test_modelo_ja_instalado_abre_sem_internet_e_o_que_falta_baixa(monkeypatch):
+    """Primeiro tenta local_files_only=True (nenhuma consulta ao huggingface.co); se não está no PC, abre do jeito normal."""
+    import faster_whisper
+    chamadas = []
+
+    def falso(modelo, device, compute_type, local_files_only=False, **kw):
+        chamadas.append(local_files_only)
+        if local_files_only and modelo == "nao-baixado":
+            raise RuntimeError("não está no cache")
+        return "ok"
+
+    monkeypatch.setattr(faster_whisper, "WhisperModel", falso)
+    assert motor.carregar_modelo(Hardware(False, "small", "cpu", "int8"))[0] == "ok" and chamadas == [True]
+    chamadas.clear()
+    assert motor.carregar_modelo(Hardware(False, "nao-baixado", "cpu", "int8"))[0] == "ok" and chamadas == [True, False]
 
 
 def test_falha_na_cpu_propaga(monkeypatch):
