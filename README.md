@@ -18,8 +18,9 @@ processador (veja [Funciona sem placa de vídeo?](#funciona-sem-placa-de-vídeo)
 | | |
 |---|---|
 | ✅ Testado | abas **Arquivo** e **YouTube**, a interface, o motor e os testes automáticos (com áudio sintético) |
-| ✅ Testado só com captura simulada | aba **Gravar** (níveis, trechos, atraso, áudio salvo, erros de dispositivo) |
-| ⏳ **Pendente** | **Gravar com microfone e som do sistema reais**: ainda não foi confirmado no hardware real |
+| ✅ Testado com microfone real | aba **Gravar**, modo **Ambiente**: gravação de 29 s em 11/11/2026, com o texto correto |
+| ✅ Testado só com captura simulada | aba **Gravar**: níveis, trechos, atraso, áudio salvo e erros de dispositivo |
+| ⏳ **Pendente** | **Gravar no modo Reunião** (som do computador + microfone): ainda não foi confirmado no hardware real |
 
 ## Sumário
 
@@ -47,8 +48,10 @@ Grava ao vivo e mostra o texto por trechos de 30 s. A fonte **Reunião** capta o
 
 <img src="docs/prints/43-gravando-texto-ao-vivo.png" alt="Aba Gravar gravando uma reunião, com medidores de nível e texto ao vivo" width="560">
 
-> ⏳ **Pendente:** a aba Gravar foi testada só com captura simulada. O teste com microfone e som do sistema reais
-> ainda não foi feito; até ser confirmado, trate-a como experimental.
+> ✅ O modo **Ambiente** (só o microfone) foi testado com um microfone real em 11/11/2026: uma gravação de 29 s saiu
+> com o texto correto.
+> ⏳ **Pendente:** o modo **Reunião** (som do computador + microfone) ainda não foi confirmado no hardware real;
+> até ser confirmado, trate-o como experimental.
 
 ## Requisitos
 
@@ -180,7 +183,8 @@ O aviso aparece aberto na primeira vez e fica recolhido depois ("Saiba mais" mos
 5. **Parar gravação** termina e processa o último pedaço. O áudio original fica salvo na pasta da gravação, em blocos de 10 min,
    e nunca é apagado.
 
-> ⏳ **Pendente:** este fluxo ainda não foi confirmado com microfone e som do sistema reais.
+> ✅ **Ambiente** testado com microfone real (11/11/2026). ⏳ **Pendente:** o modo **Reunião** ainda não foi confirmado
+> com o som do sistema real.
 
 O tema claro/escuro segue o do sistema (e há um botão para trocar), e o layout se adapta a janelas estreitas.
 
@@ -216,7 +220,8 @@ Estrutura: `src/transcritor/` (motor, serviço, captura, YouTube, web), `tests/`
 
 - **Não separa falantes:** o texto sai corrido, sem "Pessoa 1 / Pessoa 2".
 - **Gravação ao vivo só no Windows** (captura WASAPI). Em outros sistemas a aba Gravar avisa que não está disponível.
-- **Gravar ainda não foi testada com microfone e som do sistema reais** (veja o estado do projeto, no começo).
+- **O modo Reunião da aba Gravar ainda não foi testado com o som do sistema real** (o modo Ambiente, com microfone real, foi;
+  veja o estado do projeto, no começo).
 - **Modelos pequenos alucinam mais em processador.** Sobre ruído, o `base` inventou "E aí!" e o `small` já inventou um crédito
   de legenda (hoje filtrado) nos testes com ruído sintético; a placa de vídeo com `large-v3-turbo` não inventou nada. O filtro
   descarta as alucinações conhecidas, mas frases curtas e plausíveis ainda podem passar.

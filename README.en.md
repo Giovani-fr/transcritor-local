@@ -20,8 +20,9 @@ README use **simulated data** (invented sentences and synthetic audio), generate
 | | |
 |---|---|
 | ✅ Tested | the **Arquivo** (File) and **YouTube** tabs, the interface, the engine and the automated tests (synthetic audio) |
-| ✅ Tested with simulated capture only | the **Gravar** (Record) tab (levels, chunks, lag, saved audio, device errors) |
-| ⏳ **Pending** | **Recording with a real microphone and real system sound**: not yet confirmed on real hardware |
+| ✅ Tested with a real microphone | the **Gravar** (Record) tab, **Ambiente** (room) mode: a 29 s recording on 2026-11-11, with correct text |
+| ✅ Tested with simulated capture only | the **Gravar** tab: levels, chunks, lag, saved audio and device errors |
+| ⏳ **Pending** | **Record in Reunião (meeting) mode** (computer sound + microphone): not yet confirmed on real hardware |
 
 ## Contents
 
@@ -49,8 +50,10 @@ Records live and shows the text in 30 s chunks. The **Reunião** (Meeting) sourc
 
 <img src="docs/prints/43-gravando-texto-ao-vivo.png" alt="Record tab recording a meeting, with level meters and live text" width="560">
 
-> ⏳ **Pending:** the Record tab was tested with simulated capture only. The test with a real microphone and real system
-> sound has not been done yet; until it is confirmed, treat it as experimental.
+> ✅ **Ambiente** mode (microphone only) was tested with a real microphone on 2026-11-11: a 29 s recording came out with
+> correct text.
+> ⏳ **Pending:** **Reunião** mode (computer sound + microphone) has not yet been confirmed on real hardware;
+> until it is, treat it as experimental.
 
 ## Requirements
 
@@ -186,7 +189,8 @@ The notice is shown open the first time and collapsed afterwards ("Saiba mais" s
 5. **Parar gravação** (stop) finishes and processes the last piece. The original audio stays in the recording's folder,
    in 10-minute blocks, and is never deleted.
 
-> ⏳ **Pending:** this flow has not yet been confirmed with a real microphone and real system sound.
+> ✅ **Ambiente** tested with a real microphone (2026-11-11). ⏳ **Pending:** **Reunião** mode has not yet been confirmed
+> with real system sound.
 
 The light/dark theme follows the system (and there is a button to switch), and the layout adapts to narrow windows.
 
@@ -222,7 +226,8 @@ Layout: `src/transcritor/` (engine, service, capture, YouTube, web), `tests/`, `
 
 - **No speaker separation:** the text comes out as one stream, without "Person 1 / Person 2".
 - **Live recording is Windows-only** (WASAPI capture). On other systems the Record tab says it is unavailable.
-- **Recording has not yet been tested with a real microphone and real system sound** (see the project status at the top).
+- **Reunião mode of the Record tab has not yet been tested with real system sound** (Ambiente mode, with a real microphone,
+  has; see the project status at the top).
 - **Small models hallucinate more on the processor.** Over noise, `base` invented "E aí!" and `small` once invented a subtitle
   credit (now filtered) in tests with synthetic noise; the graphics card with `large-v3-turbo` invented nothing. The filter
   drops known hallucinations, but short, plausible phrases can still get through.
