@@ -22,8 +22,8 @@ README use **simulated data** (invented sentences and synthetic audio), generate
 | ✅ Tested | the **Arquivo** (File) and **YouTube** tabs, the interface, the engine and the automated tests (synthetic audio) |
 | ✅ Tested with a real microphone | the **Gravar** (Record) tab, **Ambiente** (room) mode: a 29 s recording on 2026-11-11, with correct text |
 | ✅ Tested with simulated capture only | the **Gravar** tab: levels, chunks, lag, saved audio and device errors |
-| ✅ Tested with real system sound | the **Gravar** tab, **Reunião** mode: a 1 min 6 s recording on 2026-11-11 with a video playing on the computer (`large-v3-turbo` model): audio saved in the folder and text with timestamps, correct |
-| ⏳ **Not tested** | Meet, Zoom and Teams one by one; and the microphone being captured together with system sound in Reunião mode |
+| ✅ Tested with real system sound and microphone | the **Gravar** tab, **Reunião** mode: a 1 min 6 s recording on 2026-11-11 with a video playing on the computer and a voice on the microphone (`large-v3-turbo` model): both level meters moved, the audio was saved in the folder and the text, with timestamps, came out correct |
+| ⏳ **Not tested** | Meet, Zoom and Teams one by one |
 
 ## Contents
 
@@ -53,11 +53,11 @@ Records live and shows the text in 30 s chunks. The **Reunião** (Meeting) sourc
 
 > ✅ **Ambiente** mode (microphone only) was tested with a real microphone on 2026-11-11: a 29 s recording came out with
 > correct text.
-> ✅ **Reunião** mode was tested on 2026-11-11 with **computer sound**: a 1 min 6 s recording of a video playing on the PC
-> (`large-v3-turbo` model) left the audio saved in the folder and correct text with timestamps.
+> ✅ **Reunião** mode was tested on 2026-11-11 with **computer sound and the microphone at the same time**: a 1 min 6 s
+> recording of a video playing on the PC, with a voice on the microphone (`large-v3-turbo` model), moved both level meters,
+> left the audio saved in the folder and produced correct text with timestamps.
 > ⏳ **Not tested:** Meet, Zoom and Teams individually (the program captures whatever sound Windows plays on the default
-> output, so it should work with them, but that was not verified one by one) and the microphone being captured at the same
-> time as system sound.
+> output, so it should work with them, but that was not verified one by one).
 
 ## Requirements
 
@@ -193,8 +193,8 @@ The notice is shown open the first time and collapsed afterwards ("Saiba mais" s
 5. **Parar gravação** (stop) finishes and processes the last piece. The original audio stays in the recording's folder,
    in 10-minute blocks, and is never deleted.
 
-> ✅ **Ambiente** tested with a real microphone and **Reunião** tested with computer sound (a video playing), both on
-> 2026-11-11. ⏳ **Not tested:** Meet, Zoom and Teams one by one, and the microphone together with system sound.
+> ✅ **Ambiente** tested with a real microphone and **Reunião** tested with computer sound (a video playing) and the
+> microphone together, both on 2026-11-11. ⏳ **Not tested:** Meet, Zoom and Teams one by one.
 
 The light/dark theme follows the system (and there is a button to switch), and the layout adapts to narrow windows.
 
@@ -230,8 +230,8 @@ Layout: `src/transcritor/` (engine, service, capture, YouTube, web), `tests/`, `
 
 - **No speaker separation:** the text comes out as one stream, without "Person 1 / Person 2".
 - **Live recording is Windows-only** (WASAPI capture). On other systems the Record tab says it is unavailable.
-- **Reunião:** tested with computer sound (a video playing), but **not** with Meet, Zoom and Teams one by one, and capturing the
-  microphone at the same time as system sound has not been confirmed (see the project status at the top).
+- **Reunião:** tested with computer sound (a video playing) and the microphone together, but **not** with Meet, Zoom and Teams
+  one by one (see the project status at the top).
 - **Small models hallucinate more on the processor.** Over noise, `base` invented "E aí!" and `small` once invented a subtitle
   credit (now filtered) in tests with synthetic noise; the graphics card with `large-v3-turbo` invented nothing. The filter
   drops known hallucinations, but short, plausible phrases can still get through.

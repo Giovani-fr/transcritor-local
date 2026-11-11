@@ -20,8 +20,8 @@ processador (veja [Funciona sem placa de vídeo?](#funciona-sem-placa-de-vídeo)
 | ✅ Testado | abas **Arquivo** e **YouTube**, a interface, o motor e os testes automáticos (com áudio sintético) |
 | ✅ Testado com microfone real | aba **Gravar**, modo **Ambiente**: gravação de 29 s em 11/11/2026, com o texto correto |
 | ✅ Testado só com captura simulada | aba **Gravar**: níveis, trechos, atraso, áudio salvo e erros de dispositivo |
-| ✅ Testado com som do sistema real | aba **Gravar**, modo **Reunião**: gravação de 1 min 6 s em 11/11/2026 com um vídeo tocando no computador (modelo `large-v3-turbo`): áudio guardado na pasta e texto com horários, correto |
-| ⏳ **Não testado** | Meet, Zoom e Teams um a um; e o microfone captado junto com o som do sistema no modo Reunião |
+| ✅ Testado com som do sistema e microfone reais | aba **Gravar**, modo **Reunião**: gravação de 1 min 6 s em 11/11/2026 com um vídeo tocando no computador e a voz no microfone (modelo `large-v3-turbo`): as duas barras de nível mexeram, o áudio ficou guardado na pasta e o texto, com horários, saiu correto |
+| ⏳ **Não testado** | Meet, Zoom e Teams um a um |
 
 ## Sumário
 
@@ -51,10 +51,11 @@ Grava ao vivo e mostra o texto por trechos de 30 s. A fonte **Reunião** capta o
 
 > ✅ O modo **Ambiente** (só o microfone) foi testado com um microfone real em 11/11/2026: uma gravação de 29 s saiu
 > com o texto correto.
-> ✅ O modo **Reunião** foi testado em 11/11/2026 com o **som do computador**: uma gravação de 1 min 6 s de um vídeo
-> tocando no PC (modelo `large-v3-turbo`) deixou o áudio guardado na pasta e o texto, com horários, correto.
+> ✅ O modo **Reunião** foi testado em 11/11/2026 com o **som do computador e o microfone ao mesmo tempo**: uma gravação de
+> 1 min 6 s de um vídeo tocando no PC, com a voz no microfone (modelo `large-v3-turbo`), mexeu as duas barras de nível,
+> deixou o áudio guardado na pasta e o texto, com horários, correto.
 > ⏳ **Não testado:** Meet, Zoom e Teams individualmente (o programa capta o som que o Windows toca na saída padrão, então
-> deve funcionar com eles, mas isso não foi verificado um a um) e o microfone captado ao mesmo tempo que o som do sistema.
+> deve funcionar com eles, mas isso não foi verificado um a um).
 
 ## Requisitos
 
@@ -186,8 +187,8 @@ O aviso aparece aberto na primeira vez e fica recolhido depois ("Saiba mais" mos
 5. **Parar gravação** termina e processa o último pedaço. O áudio original fica salvo na pasta da gravação, em blocos de 10 min,
    e nunca é apagado.
 
-> ✅ **Ambiente** testado com microfone real e **Reunião** testado com o som do computador (um vídeo tocando), ambos em
-> 11/11/2026. ⏳ **Não testado:** Meet, Zoom e Teams um a um, e o microfone junto com o som do sistema.
+> ✅ **Ambiente** testado com microfone real e **Reunião** testado com o som do computador (um vídeo tocando) e o microfone
+> juntos, ambos em 11/11/2026. ⏳ **Não testado:** Meet, Zoom e Teams um a um.
 
 O tema claro/escuro segue o do sistema (e há um botão para trocar), e o layout se adapta a janelas estreitas.
 
@@ -223,8 +224,8 @@ Estrutura: `src/transcritor/` (motor, serviço, captura, YouTube, web), `tests/`
 
 - **Não separa falantes:** o texto sai corrido, sem "Pessoa 1 / Pessoa 2".
 - **Gravação ao vivo só no Windows** (captura WASAPI). Em outros sistemas a aba Gravar avisa que não está disponível.
-- **Reunião:** testado com o som do computador (um vídeo tocando), mas **não** com Meet, Zoom e Teams um a um, e a captação do
-  microfone ao mesmo tempo que o som do sistema não foi confirmada (veja o estado do projeto, no começo).
+- **Reunião:** testado com o som do computador (um vídeo tocando) e o microfone juntos, mas **não** com Meet, Zoom e Teams um a
+  um (veja o estado do projeto, no começo).
 - **Modelos pequenos alucinam mais em processador.** Sobre ruído, o `base` inventou "E aí!" e o `small` já inventou um crédito
   de legenda (hoje filtrado) nos testes com ruído sintético; a placa de vídeo com `large-v3-turbo` não inventou nada. O filtro
   descarta as alucinações conhecidas, mas frases curtas e plausíveis ainda podem passar.
