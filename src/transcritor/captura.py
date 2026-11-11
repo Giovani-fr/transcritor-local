@@ -128,8 +128,8 @@ MSG_SEM_COMPONENTE = ("Falta um componente para gravar neste computador (PyAudio
                       "Instale de novo as dependências com: pip install -r requirements.txt")
 MSG_SEM_MIC = ("Não encontrei nenhum microfone. Conecte um microfone (ou um fone com microfone) "
                "e atualize a página.")
-MSG_SEM_SISTEMA = ("Não encontrei o dispositivo de som do computador (alto-falante ou fone) para captar a "
-                   "reunião. Confira se há uma saída de som ativa no Windows.")
+MSG_SEM_SISTEMA = ("Não encontrei a saída de som do computador. Confirme que o fone ou o alto-falante "
+                   "está conectado e tente de novo.")
 MSG_MIC_ABRIR = ("Não consegui usar o microfone. Confira se o Windows deixa os programas usarem o microfone "
                  "(Configurações > Privacidade e segurança > Microfone) e se outro programa não o está usando.")
 MSG_SISTEMA_ABRIR = ("Não consegui captar o som do computador. Tente de novo; se continuar, escolha outra "
@@ -137,6 +137,7 @@ MSG_SISTEMA_ABRIR = ("Não consegui captar o som do computador. Tente de novo; s
 MSG_PERDEU = ("O microfone ou a saída de som parou de responder (foi desconectado?). "
               "O que já foi gravado ficou salvo.")
 MSG_CAPTURA = "Não consegui começar a captar o som. Tente de novo."
+MSG_PROCESSO = "A captura de áudio parou. O que já foi gravado ficou salvo."
 
 
 class ErroCaptura(Exception):
@@ -207,7 +208,19 @@ class ConjuntoCaptura:
 
 
 class DispositivosWasapi:
-    """Dispositivos reais do Windows (WASAPI): microfones e o som do sistema (loopback)."""
+    """Dispositivos reais do Windows (WASAPI): microfones e o som do sistema (loopback).
+
+    O PortAudio não aguenta ser iniciado/encerrado por várias threads ao mesmo tempo (isso derrubava o
+    programa com "access violation"). Por isso há UMA instância de PyAudio, sempre usada sob ``_lock``.
+    Ela só é recriada (para enxergar fones recém-conectados) quando não há nenhuma captura aberta.
+    """
+
+    def __init__(self, validade_s: float = 5.0, relogio=time.monotonic):
+        self._lock = threading.RLock()
+        self._pa = None
+        self._desde = 0.0
+        self._abertas = 0
+        self._validade_s, self._relogio = validade_s, relogio
 
     def suportado(self) -> tuple[bool, str]:
         if sys.platform != "win32":
@@ -218,23 +231,52 @@ class DispositivosWasapi:
             return False, MSG_SEM_COMPONENTE
         return True, ""
 
+    # ---- instância única (chame sempre com _lock) ----
+    def _instancia(self):
+        import pyaudiowpatch as pyaudio
+        agora = self._relogio()
+        if self._pa is not None and self._abertas == 0 and agora - self._desde > self._validade_s:
+            self._descartar()
+        if self._pa is None:
+            self._pa = pyaudio.PyAudio()
+            self._desde = agora
+        return self._pa
+
+    def _descartar(self) -> None:
+        pa, self._pa = self._pa, None
+        if pa is not None:
+            try:
+                pa.terminate()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def encerrar(self) -> None:
+        with self._lock:
+            if self._abertas == 0:
+                self._descartar()
+
+    def _fechou_uma(self) -> None:
+        with self._lock:
+            self._abertas = max(0, self._abertas - 1)
+
     def microfones(self) -> list[dict]:
         import pyaudiowpatch as pyaudio
-        pa = pyaudio.PyAudio()
-        try:
-            host = pa.get_host_api_info_by_type(pyaudio.paWASAPI)
-            padrao = host.get("defaultInputDevice", -1)
-            vistos, saida = set(), []
-            for i in range(host["deviceCount"]):
-                d = pa.get_device_info_by_host_api_device_index(host["index"], i)
-                if d["maxInputChannels"] > 0 and not d.get("isLoopbackDevice") and d["name"] not in vistos:
-                    vistos.add(d["name"])
-                    saida.append({"id": d["name"], "nome": d["name"], "padrao": d["index"] == padrao})
-            return saida
-        except OSError:
-            return []
-        finally:
-            pa.terminate()
+        with self._lock:
+            pa = self._instancia()
+            try:
+                host = pa.get_host_api_info_by_type(pyaudio.paWASAPI)
+                padrao = host.get("defaultInputDevice", -1)
+                vistos, saida = set(), []
+                for i in range(host["deviceCount"]):
+                    d = pa.get_device_info_by_host_api_device_index(host["index"], i)
+                    if d["maxInputChannels"] > 0 and not d.get("isLoopbackDevice") and d["name"] not in vistos:
+                        vistos.add(d["name"])
+                        saida.append({"id": d["name"], "nome": d["name"], "padrao": d["index"] == padrao})
+                return saida
+            except OSError:
+                if self._abertas == 0:
+                    self._descartar()
+                return []
 
     def abrir(self, fonte: str, microfone: str | None = None) -> ConjuntoCaptura:
         """Abre o microfone (e, na reunião, o som do sistema). Levanta ErroCaptura."""
@@ -242,27 +284,30 @@ class DispositivosWasapi:
         if not ok:
             raise ErroCaptura(motivo, "nao_suportado")
         import pyaudiowpatch as pyaudio
-        pa = pyaudio.PyAudio()
-        abertas: list[Captura] = []
-        try:
-            dev_mic = self._achar_microfone(pa, pyaudio, microfone)
-            dev_sis = self._achar_loopback(pa) if fonte == "reuniao" else None
-            for dev, rotulo, msg in ((dev_mic, "mic", MSG_MIC_ABRIR), (dev_sis, "sistema", MSG_SISTEMA_ABRIR)):
-                if dev is None:
-                    continue
-                try:
-                    abertas.append(Captura(pa, dev, rotulo))
-                except (OSError, ValueError) as e:
-                    raise ErroCaptura(msg, "mic_abrir" if rotulo == "mic" else "sistema_abrir") from e
-        except BaseException:
-            for c in abertas:
-                try:
-                    c.fechar()
-                except Exception:  # noqa: BLE001
-                    pass
-            pa.terminate()
-            raise
-        return ConjuntoCaptura(abertas, pa.terminate)
+        with self._lock:
+            pa = self._instancia()
+            abertas: list[Captura] = []
+            try:
+                dev_mic = self._achar_microfone(pa, pyaudio, microfone)
+                dev_sis = self._achar_loopback(pa) if fonte == "reuniao" else None
+                for dev, rotulo, msg in ((dev_mic, "mic", MSG_MIC_ABRIR), (dev_sis, "sistema", MSG_SISTEMA_ABRIR)):
+                    if dev is None:
+                        continue
+                    try:
+                        abertas.append(Captura(pa, dev, rotulo))
+                    except (OSError, ValueError) as e:
+                        raise ErroCaptura(msg, "mic_abrir" if rotulo == "mic" else "sistema_abrir") from e
+            except BaseException:
+                for c in abertas:
+                    try:
+                        c.fechar()
+                    except Exception:  # noqa: BLE001
+                        pass
+                if self._abertas == 0:          # recomeça do zero na próxima vez (fone novo, estado estranho)
+                    self._descartar()
+                raise
+            self._abertas += 1
+        return ConjuntoCaptura(abertas, self._fechou_uma)
 
     @staticmethod
     def _achar_microfone(pa, pyaudio, nome: str | None) -> dict:
@@ -291,7 +336,7 @@ class DispositivosWasapi:
     def _achar_loopback(pa) -> dict:
         try:
             return pa.get_default_wasapi_loopback()
-        except (OSError, LookupError) as e:
+        except (OSError, LookupError, ValueError) as e:      # ValueError: a saída padrão não é um dispositivo de saída
             raise ErroCaptura(MSG_SEM_SISTEMA, "sem_sistema") from e
 
 

@@ -85,11 +85,14 @@ def test_lista_microfones_sem_loopback_e_sem_repetidos(monkeypatch):
 
 def test_ambiente_abre_so_o_microfone_escolhido(monkeypatch):
     fluxos, estado = instalar_pyaudio_falso(monkeypatch, [dev(0, "Mic A"), dev(1, "Mic B")], padrao_entrada=0)
-    c = DispositivosWasapi().abrir("ambiente", "Mic B")
+    d = DispositivosWasapi()
+    c = d.abrir("ambiente", "Mic B")
     assert [x.rotulo for x in c.capturas] == ["mic"] and len(fluxos) == 1
     c.fechar()
     c.fechar()                                                   # fechar duas vezes é inofensivo
-    assert fluxos[0].fechado and estado["terminou"] == 1
+    assert fluxos[0].fechado and estado["terminou"] == 0        # a instância única segue viva para a próxima
+    d.encerrar()
+    assert estado["terminou"] == 1
 
 
 def test_microfone_escolhido_que_sumiu_cai_no_padrao(monkeypatch):
@@ -112,7 +115,7 @@ def test_sem_microfone(monkeypatch):
     _, estado = instalar_pyaudio_falso(monkeypatch, [dev(1, "Alto-falante [Loopback]", 2, True)])
     with pytest.raises(ErroCaptura) as e:
         DispositivosWasapi().abrir("ambiente")
-    assert (e.value.mensagem, e.value.codigo) == (MSG_SEM_MIC, "sem_microfone") and estado["terminou"] == 1
+    assert (e.value.mensagem, e.value.codigo) == (MSG_SEM_MIC, "sem_microfone") and estado["terminou"] == 1   # recomeça do zero
 
 
 def test_reuniao_sem_dispositivo_de_som_do_sistema(monkeypatch):
@@ -185,3 +188,37 @@ def test_nivel_visual_vai_de_vazio_a_cheio():
     assert nivel_visual(np.zeros(100, np.float32)) == 0.0
     assert nivel_visual(np.full(100, 1.0, np.float32)) == 1.0
     assert 0.45 < nivel_visual(np.full(100, 0.03, np.float32)) < 0.55      # ≈ -30 dBFS
+
+
+def test_loopback_com_saida_invalida_vira_mensagem_simples(monkeypatch):
+    """No Windows, get_default_wasapi_loopback levanta ValueError quando a saída padrão não é de saída."""
+    instalar_pyaudio_falso(monkeypatch, [dev(0, "Mic A")], padrao_entrada=0)
+    import sys as _sys
+
+    def sem_saida(self):
+        raise ValueError("`info_dict` must represent an output device")
+    _sys.modules["pyaudiowpatch"].PyAudio.get_default_wasapi_loopback = sem_saida
+    with pytest.raises(ErroCaptura) as e:
+        DispositivosWasapi().abrir("reuniao")
+    assert (e.value.mensagem, e.value.codigo) == (MSG_SEM_SISTEMA, "sem_sistema")
+    assert "Não encontrei a saída de som do computador" in e.value.mensagem
+
+
+def test_uma_unica_instancia_do_pyaudio_e_criada_so_quando_nao_ha_captura(monkeypatch):
+    """Listar e abrir várias vezes reaproveita o mesmo PyAudio; ele só é refeito com tudo fechado e a lista velha."""
+    criados = []
+    fluxos, estado = instalar_pyaudio_falso(monkeypatch, [dev(0, "Mic A")], padrao_entrada=0)
+    PA = sys.modules["pyaudiowpatch"].PyAudio
+    original = PA.__init__
+    PA.__init__ = lambda self: (criados.append(1), original(self))[1]
+    t = [0.0]
+    d = DispositivosWasapi(validade_s=5.0, relogio=lambda: t[0])
+    d.microfones(); d.microfones()
+    c = d.abrir("ambiente")
+    t[0] = 60.0                                   # lista "velha", mas há uma captura aberta: não recria
+    d.microfones(); d.abrir("ambiente").fechar()
+    assert len(criados) == 1
+    c.fechar()
+    t[0] = 120.0                                  # tudo fechado e velho: agora enxerga fones novos
+    d.microfones()
+    assert len(criados) == 2 and estado["terminou"] == 1

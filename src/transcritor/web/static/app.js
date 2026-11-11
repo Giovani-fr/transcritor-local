@@ -39,10 +39,11 @@
     const m = /^(\d{4})-(\d\d)-(\d\d) (\d\d:\d\d)/.exec(txt || "");
     return m ? m[3] + "/" + m[2] + "/" + m[1] + " " + m[4] : "";
   }
-  function aviso(msg) {
+  const MSG_ENCERRADO = "O programa foi encerrado. Feche esta aba e abra o iniciar.bat de novo. Seus áudios e textos anteriores estão salvos.";
+  function aviso(msg, ms = 2500) {
     const t = $("#aviso-rapido");
     t.textContent = msg; t.hidden = false;
-    clearTimeout(aviso.t); aviso.t = setTimeout(() => { t.hidden = true; }, 2500);
+    clearTimeout(aviso.t); aviso.t = setTimeout(() => { t.hidden = true; }, ms);
   }
   function mbTexto(mb) { return mb >= 1000 ? (mb / 1024).toFixed(1).replace(".", ",") + " GB" : Math.round(mb) + " MB"; }
   function barra(el, frac) {
@@ -150,7 +151,7 @@
         mostrarResultado(false, ...linhas);
         confirmar.hidden = true;           // deu certo: não oferece atualizar outra vez
       } catch (e) {
-        const msg = e instanceof TypeError ? "Não consegui falar com o programa. Confira se a janela preta ainda está aberta." : e.message;
+        const msg = e instanceof TypeError ? MSG_ENCERRADO : e.message;
         mostrarResultado(true, document.createTextNode(msg));
         confirmar.hidden = true; atualizar.hidden = false; atualizar.textContent = "Tentar de novo";
       } finally { botoes.hidden = false; pergunta.textContent = "Vou instalar a versão mais recente do yt-dlp. Continuar?"; }
@@ -399,6 +400,7 @@
     });
     es.addEventListener("linha", (e) => { estado.linhas.push(JSON.parse(e.data)); if (etapaPainel() === "andamento") desenharAoVivo(); });
     es.addEventListener("historico", carregarHistorico);
+    es.addEventListener("aviso", (e) => aviso(JSON.parse(e.data).texto, 8000));
     es.addEventListener("nivel", (e) => pintarNiveis(JSON.parse(e.data).niveis));
   }
 
@@ -504,7 +506,7 @@
       const d = await r.json();
       if (!r.ok) erroYt(d); else { estado.video = d; renderVideo(); }
     } catch (e) {
-      erroYt({ detail: "Não consegui falar com o programa. Confira se a janela preta ainda está aberta." });
+      erroYt({ detail: MSG_ENCERRADO });
     } finally { botao.disabled = false; botao.textContent = "Buscar vídeo"; }
   }
   async function iniciarYoutube(url, modo, botao) {
@@ -518,7 +520,7 @@
       const d = await r.json();
       if (r.status === 409) aviso(d.detail); else erroYt(d);
     } catch (e) {
-      erroYt({ detail: "Não consegui falar com o programa. Confira se a janela preta ainda está aberta." });
+      erroYt({ detail: MSG_ENCERRADO });
     } finally { if (botao) { botao.disabled = false; botao.textContent = antes; renderVideo(); } }
   }
   $("#form-yt").addEventListener("submit", (e) => { e.preventDefault(); consultarVideo(); });
@@ -685,7 +687,7 @@
       const d = await r.json();
       if (r.status === 409) aviso(d.detail); else estado.grav.erro = d.detail || "Não consegui começar a gravar.";
     } catch (e) {
-      estado.grav.erro = "Não consegui falar com o programa. Confira se a janela preta ainda está aberta.";
+      estado.grav.erro = MSG_ENCERRADO;
     } finally { botao.disabled = false; render(); }
   }
   $("#btn-gravar-iniciar").addEventListener("click", () => {

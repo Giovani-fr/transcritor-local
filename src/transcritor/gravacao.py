@@ -60,6 +60,8 @@ class Previa:
             while not self._fim.wait(self.passo_s):
                 if self._relogio() - self._ultimo > self.ociosa_s:
                     break
+                if not all(c.ativa() for c in self.conjunto.capturas):
+                    break                                # a captura caiu: a página liga de novo na próxima renovação
                 niveis = {}
                 for c in self.conjunto.capturas:
                     try:
@@ -117,7 +119,7 @@ class Gravacao:
                 for c in self.conjunto.capturas:
                     try:
                         if not c.ativa():
-                            raise ErroCaptura(MSG_PERDEU, "perdeu")
+                            raise getattr(c, "erro_perda", None) or ErroCaptura(MSG_PERDEU, "perdeu")
                         x = c.coletar()
                     except ErroCaptura as e:
                         falha, x = e, np.zeros(0, np.float32)

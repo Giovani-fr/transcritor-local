@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Str
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import config, erros
+from .. import config, diagnostico, erros
 from ..captura import DispositivosSimulados, ErroCaptura
 from ..hardware import detectar_hardware
 from ..servico import FONTES, NaoPronto, Ocupado, Servico
@@ -77,9 +77,12 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
     @asynccontextmanager
     async def vida(app):
         if iniciar:
+            diagnostico.ativar(servico.saidas)        # um crash nativo deixa a pilha em saidas/crash.log
             servico.iniciar()
         yield
         servico.encerrar()
+        if iniciar:
+            diagnostico.desativar()
 
     app = FastAPI(title="transcritor-local", lifespan=vida)
     app.state.servico = servico

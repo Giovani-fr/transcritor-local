@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Callable
 
 from . import erros, modelos, motor
-from .captura import MSG_CAPTURA, DispositivosWasapi, ErroCaptura
+from .captura import MSG_CAPTURA, MSG_PROCESSO, ErroCaptura
+from .captura_proc import DispositivosIsolados
 from .gravacao import ATRASO_AVISO_S, Gravacao, Previa
 from .hardware import AVISO_CPU_CURTO, Hardware, detectar_hardware
 from .historico import ARQ_TEXTO, Historico
@@ -61,7 +62,10 @@ class Servico:
         self.historico = Historico(self.saidas)
         self._detectar, self._instalado, self._baixar, self._carregar = detectar, instalado, baixar, carregar
         self.yt = youtube or ProvedorYoutube()
-        self.dispositivos = dispositivos or DispositivosWasapi()
+        # a captura real roda num processo separado: se o PortAudio travar, só ele cai
+        self.dispositivos = dispositivos or DispositivosIsolados(saidas=self.saidas)
+        if hasattr(self.dispositivos, "ao_morrer"):
+            self.dispositivos.ao_morrer = self._captura_morreu
         self._atualizar_ytdlp, self._versao_ytdlp = atualizar_ytdlp, versao_ytdlp
         self._atualizando = False
         self._previa: Previa | None = None
@@ -388,11 +392,21 @@ class Servico:
     def _abrir_captura(self, fonte: str, microfone: str | None):
         try:
             return self.dispositivos.abrir(fonte, microfone or None)
-        except ErroCaptura:
+        except ErroCaptura as e:
+            if e.__cause__ is not None:          # erro inesperado dentro do processo de captura
+                erros.registrar(self.saidas, e.__cause__)
             raise
         except Exception as e:  # noqa: BLE001
             erros.registrar(self.saidas, e)
             raise ErroCaptura(MSG_CAPTURA, "captura") from e
+
+    def _captura_morreu(self, codigo: int | None, tinha_sessao: bool) -> None:
+        """O processo de captura caiu (o servidor segue no ar). Guarda o detalhe e avisa a página."""
+        erros.registrar(self.saidas, RuntimeError(
+            f"O processo de captura de áudio terminou de repente (código {codigo}). "
+            "A pilha, se houver, está em crash-captura.log."))
+        if tinha_sessao:
+            self.publicar("aviso", {"texto": MSG_PROCESSO})
 
     def _publicar_nivel(self, origem: str, niveis: dict) -> None:
         self.publicar("nivel", {"origem": origem, "niveis": niveis})
@@ -488,6 +502,8 @@ class Servico:
         with self.lock:
             if self.trabalho and self.trabalho["fase"] in FASES_ATIVAS:
                 self._parar.set()
+        if hasattr(self.dispositivos, "encerrar"):
+            self.dispositivos.encerrar()
 
     # ---------- texto ----------
     def texto(self, id_: str, horarios: bool = True) -> str | None:
