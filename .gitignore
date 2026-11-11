@@ -12,6 +12,7 @@ saidas/
 *.txt
 !requirements.txt
 !requirements-dev.txt
+!requirements-gpu.txt
 
 # Planejamento interno
 _planejamento/

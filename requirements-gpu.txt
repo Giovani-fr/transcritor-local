@@ -1,0 +1,4 @@
+# Opcional: aceleração por GPU Nvidia (CUDA 12) no Windows.
+# Instale só se o PC tiver placa Nvidia:  pip install -r requirements-gpu.txt
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
