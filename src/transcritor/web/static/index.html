@@ -40,6 +40,7 @@
     <div id="banner-hw" class="aviso" hidden>
       <div class="banner-linha">
         <span id="hw-msg"></span>
+        <button id="hw-copiar" class="link" type="button" hidden>Copiar comando</button>
         <button id="hw-mais" class="link" type="button" aria-expanded="false" aria-controls="hw-detalhe" hidden>Saiba mais</button>
       </div>
       <p id="hw-detalhe" class="banner-detalhe" hidden></p>
@@ -100,6 +101,10 @@
               <option value="auto">Detectar automaticamente</option>
             </select>
           </label>
+          <label class="marcar opcao-cpu" hidden>
+            <input class="chk-cpu" type="checkbox">
+            <span>Usar o processador mesmo com placa de vídeo. Mais lento, mas útil se a placa der problema. Na primeira vez pode pedir para baixar um modelo menor.</span>
+          </label>
         </details>
       </div>
 
@@ -155,6 +160,10 @@
             <input id="yt-manter" type="checkbox">
             <span>Guardar o áudio baixado (modo Preciso). Por padrão ele é apagado ao terminar.</span>
           </label>
+          <label class="marcar opcao-cpu" hidden>
+            <input class="chk-cpu" type="checkbox">
+            <span>Usar o processador mesmo com placa de vídeo. Mais lento, mas útil se a placa der problema. Na primeira vez pode pedir para baixar um modelo menor.</span>
+          </label>
         </details>
       </div>
 
@@ -199,6 +208,10 @@
             <label class="campo">
               <span>Microfone</span>
               <select id="grav-mic"></select>
+            </label>
+            <label class="marcar opcao-cpu" hidden>
+              <input class="chk-cpu" type="checkbox">
+              <span>Usar o processador mesmo com placa de vídeo. Mais lento, mas útil se a placa der problema. Na primeira vez pode pedir para baixar um modelo menor.</span>
             </label>
           </details>
         </div>

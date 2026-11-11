@@ -120,6 +120,11 @@ If the PC has an **Nvidia graphics card** (with an up-to-date driver), also inst
 
 Without an Nvidia card, **skip this command**: the program uses the processor on its own.
 
+If you have an Nvidia card and forgot this command (or the driver is old), the program notices: it shows the notice
+*"Encontrei sua placa Nvidia, mas faltam as bibliotecas para usá-la. Rode: `pip install -r requirements-gpu.txt`"*
+("I found your Nvidia card, but the libraries to use it are missing"), with a **Copiar comando** (copy command) button, and
+meanwhile uses the processor. It only says "I did not find an Nvidia card" when there really is none.
+
 **3. Start the program:** double-click `iniciar.bat`. It opens your browser at `http://127.0.0.1:8765`.
 The first time, the screen asks you to download the model (**Baixar e começar** button; ≈ 0.5 GB on the processor,
 ≈ 1.6 GB with a graphics card).
@@ -133,6 +138,10 @@ The program only serves your own computer (`127.0.0.1`): nobody on your network 
 little less accurate. Live recording keeps up as long as each 30 s chunk takes well under 30 s to process; if it falls
 behind, a lag indicator appears.
 
+Tip: with a graphics card, **Avançado → "Usar o processador mesmo com placa de vídeo"** ("use the processor even with a
+graphics card", off by default) forces the processor, useful if the card misbehaves. The first time it may ask you to
+download the smaller model (≈ 0.5 GB).
+
 The notice is shown open the first time and collapsed afterwards ("Saiba mais" shows the details):
 
 <p>
@@ -142,6 +151,8 @@ The notice is shown open the first time and collapsed afterwards ("Saiba mais" s
 <p>
   <img src="docs/prints/55-cpu-transcrevendo.png" alt="Transcription in progress on the processor" width="400">
   <img src="docs/prints/56-cpu-resultado.png" alt="Result of a transcription done on the processor, with the small model" width="400">
+  <img src="docs/prints/57-aviso-placa-sem-bibliotecas.png" alt="Notice that the Nvidia card was found but its libraries are missing, with the copy command button" width="400">
+  <img src="docs/prints/58-avancado-usar-processador.png" alt="In Avançado, the option to use the processor even with a graphics card" width="400">
 </p>
 
 ## How to use

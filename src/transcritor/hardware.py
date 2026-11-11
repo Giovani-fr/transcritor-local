@@ -18,6 +18,16 @@ AVISO_CPU = ("Não encontrei uma placa de vídeo Nvidia compatível, então vou 
 
 AVISO_CPU_CURTO = "Sem placa de vídeo Nvidia: vou usar o processador (mais lento)."
 
+COMANDO_GPU = "pip install -r requirements-gpu.txt"
+AVISO_SEM_BIBLIOTECAS = f"Encontrei sua placa Nvidia, mas faltam as bibliotecas para usá-la. Rode: {COMANDO_GPU}"
+AVISO_SEM_BIBLIOTECAS_DETALHE = (
+    "Depois de instalar, feche a janela preta e abra o iniciar.bat de novo. Se você já instalou e este aviso "
+    "continua, o driver da placa Nvidia pode estar antigo: atualize-o. Enquanto isso o programa usa o "
+    "processador, que funciona normalmente, só é mais lento e um pouco menos preciso.")
+AVISO_CPU_ESCOLHA = "Usando o processador por escolha sua, mesmo com placa de vídeo (mais lento)."
+AVISO_CPU_ESCOLHA_DETALHE = ('Para voltar a usar a placa de vídeo, desmarque "Usar o processador mesmo com placa de '
+                             'vídeo" em Avançado.')
+
 _dll_ok = False
 
 
@@ -88,20 +98,37 @@ class Hardware:
     ram_gb: float = 0.0
     aviso: str = ""
     cpu_threads: int = 0      # 0 = deixar o faster-whisper escolher
+    placa_sem_cuda: bool = False   # há placa Nvidia, mas o CUDA não está utilizável (bibliotecas ou driver)
+    escolha_cpu: bool = False      # o usuário pediu o processador mesmo com placa de vídeo
 
     def como_cpu(self, modelo: str = MODELO_CPU, aviso: str = AVISO_CPU) -> "Hardware":
-        return Hardware(False, modelo, "cpu", "int8", self.gpu, self.ram_gb, aviso, self.cpu_threads)
+        return Hardware(False, modelo, "cpu", "int8", self.gpu, self.ram_gb, aviso, self.cpu_threads,
+                        self.placa_sem_cuda, self.escolha_cpu)
 
 
 def detectar_hardware(forcar_cpu: bool = False, modelo: str | None = None,
-                      cpu_threads: int = 0) -> Hardware:
+                      cpu_threads: int = 0, usar_processador: bool = False) -> Hardware:
     """Escolhe dispositivo e modelo: GPU Nvidia → large-v3-turbo; senão CPU → small/base.
 
+    Casos de CPU, cada um com seu aviso:
+    - ``forcar_cpu`` (testes/medições): como se não houvesse placa;
+    - ``usar_processador`` (escolha do usuário em "Avançado"): vale mesmo com placa de vídeo;
+    - placa Nvidia achada pelo ``nvidia-smi`` mas CUDA inutilizável: pede para instalar ``requirements-gpu.txt``;
+    - nenhuma placa: "não encontrei placa Nvidia".
     ``modelo`` e ``cpu_threads`` permitem forçar a escolha (testes e medições).
     """
     ram = ram_total_gb()
-    if not forcar_cpu and _cuda_disponivel():
-        return Hardware(True, modelo or MODELO_GPU, "cuda", "int8_float16", _nome_gpu(), ram,
-                        cpu_threads=cpu_threads)
     padrao = MODELO_CPU_FRACO if 0 < ram < RAM_MINIMA_SMALL_GB else MODELO_CPU
+    if forcar_cpu:
+        return Hardware(False, modelo or padrao, "cpu", "int8", "", ram, AVISO_CPU, cpu_threads)
+    placa = _nome_gpu()
+    cuda = _cuda_disponivel()
+    if cuda and not usar_processador:
+        return Hardware(True, modelo or MODELO_GPU, "cuda", "int8_float16", placa, ram, cpu_threads=cpu_threads)
+    if usar_processador and (cuda or placa):
+        return Hardware(False, modelo or padrao, "cpu", "int8", placa, ram, AVISO_CPU_ESCOLHA, cpu_threads,
+                        escolha_cpu=True)
+    if placa:
+        return Hardware(False, modelo or padrao, "cpu", "int8", placa, ram, AVISO_SEM_BIBLIOTECAS, cpu_threads,
+                        placa_sem_cuda=True)
     return Hardware(False, modelo or padrao, "cpu", "int8", "", ram, AVISO_CPU, cpu_threads)

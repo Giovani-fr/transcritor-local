@@ -118,6 +118,10 @@ Se o PC tem **placa de vídeo Nvidia** (com o driver atualizado), instale també
 
 Sem placa Nvidia, **pule este comando**: o programa usa o processador sozinho.
 
+Se você tem placa Nvidia e esqueceu este comando (ou o driver está antigo), o programa percebe: mostra o aviso
+*"Encontrei sua placa Nvidia, mas faltam as bibliotecas para usá-la. Rode: `pip install -r requirements-gpu.txt`"*, com o
+botão **Copiar comando**, e enquanto isso usa o processador. Só diz *"não encontrei placa Nvidia"* quando não há placa.
+
 **3. Abra o programa:** dê dois cliques em `iniciar.bat`. Ele abre o navegador em `http://127.0.0.1:8765`.
 Na primeira vez a tela pede para baixar o modelo (botão **Baixar e começar**; ≈ 0,5 GB no processador, ≈ 1,6 GB com placa de vídeo).
 
@@ -130,6 +134,9 @@ O programa só atende o seu próprio computador (`127.0.0.1`): ninguém na sua r
 pouco menos preciso. A gravação ao vivo acompanha enquanto cada trecho de 30 s demorar bem menos que 30 s para ser processado;
 se ficar para trás, aparece um indicador de atraso.
 
+Dica: com placa de vídeo, **Avançado → "Usar o processador mesmo com placa de vídeo"** (desligado por padrão) força o
+processador, útil se a placa der problema. Na primeira vez isso pode pedir para baixar o modelo menor (≈ 0,5 GB).
+
 O aviso aparece aberto na primeira vez e fica recolhido depois ("Saiba mais" mostra o detalhe):
 
 <p>
@@ -139,6 +146,8 @@ O aviso aparece aberto na primeira vez e fica recolhido depois ("Saiba mais" mos
 <p>
   <img src="docs/prints/55-cpu-transcrevendo.png" alt="Transcrição em andamento no processador" width="400">
   <img src="docs/prints/56-cpu-resultado.png" alt="Resultado de uma transcrição feita no processador, com o modelo small" width="400">
+  <img src="docs/prints/57-aviso-placa-sem-bibliotecas.png" alt="Aviso de que a placa Nvidia foi encontrada mas faltam as bibliotecas, com o botão Copiar comando" width="400">
+  <img src="docs/prints/58-avancado-usar-processador.png" alt="Em Avançado, a opção de usar o processador mesmo com placa de vídeo" width="400">
 </p>
 
 ## Como usar

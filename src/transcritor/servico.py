@@ -4,6 +4,7 @@ Não depende do FastAPI: a camada web só chama estes métodos e repassa os even
 """
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import threading
@@ -15,7 +16,8 @@ from . import erros, modelos, motor
 from .captura import MSG_CAPTURA, MSG_PROCESSO, ErroCaptura
 from .captura_proc import DispositivosIsolados
 from .gravacao import ATRASO_AVISO_S, Gravacao, Previa
-from .hardware import AVISO_CPU_CURTO, Hardware, detectar_hardware
+from .hardware import (AVISO_CPU_CURTO, AVISO_CPU_ESCOLHA, AVISO_CPU_ESCOLHA_DETALHE, AVISO_SEM_BIBLIOTECAS,
+                       AVISO_SEM_BIBLIOTECAS_DETALHE, COMANDO_GPU, Hardware, detectar_hardware)
 from .historico import ARQ_TEXTO, Historico
 from .motor import Linha, formatar_tempo
 from .youtube import ErroYoutube, ProvedorYoutube, atualizar_ytdlp, escolher_legenda, extrair_id, versao_ytdlp
@@ -41,13 +43,21 @@ def estimar_restante(decorrido_s: float, progresso: float) -> float | None:
 
 
 def descrever_hardware(hw: Hardware) -> dict:
+    comando = ""
     if hw.usa_gpu:
         nome = hw.gpu.split(",")[0].strip() if hw.gpu else "Nvidia"
         msg, detalhe = f"Placa de vídeo detectada ({nome}): transcrição rápida.", ""
+    elif hw.placa_sem_cuda:
+        msg, detalhe, comando = AVISO_SEM_BIBLIOTECAS, AVISO_SEM_BIBLIOTECAS_DETALHE, COMANDO_GPU
+    elif hw.escolha_cpu:
+        msg, detalhe = AVISO_CPU_ESCOLHA, AVISO_CPU_ESCOLHA_DETALHE
     else:
         msg, detalhe = AVISO_CPU_CURTO, hw.aviso
     return {"usa_gpu": hw.usa_gpu, "gpu": hw.gpu, "modelo": hw.modelo, "ram_gb": round(hw.ram_gb, 1),
-            "mensagem": msg, "detalhe": detalhe, "aviso": bool(hw.aviso)}
+            "mensagem": msg, "detalhe": detalhe, "aviso": bool(hw.aviso), "comando": comando,
+            "usar_processador": hw.escolha_cpu,
+            # a opção só faz sentido com placa de vídeo utilizável (ou já trocada pelo processador por escolha)
+            "pode_escolher_cpu": bool(hw.usa_gpu or hw.escolha_cpu)}
 
 
 class Servico:
@@ -72,6 +82,7 @@ class Servico:
         self._lock_previa = threading.Lock()
         self._info_cache: dict[str, dict] = {}     # evita consultar o YouTube de novo ao clicar em Transcrever
         self._hw = hw
+        self.usar_processador = self._ler_preferencia()
         self.publicar: Publicar = publicar or (lambda tipo, dados: None)
         self.lock = threading.RLock()
         self.modelo = None
@@ -104,6 +115,34 @@ class Servico:
         with self.lock:
             self.estado_modelo.update(campos)
         self._pub()
+
+    # ---------- preferência: usar o processador mesmo com placa de vídeo ----------
+    def _arquivo_preferencias(self) -> Path:
+        return self.saidas / "preferencias.json"
+
+    def _ler_preferencia(self) -> bool:
+        try:
+            return bool(json.loads(self._arquivo_preferencias().read_text(encoding="utf-8")).get("usar_processador"))
+        except (OSError, ValueError, AttributeError):
+            return False
+
+    def definir_usar_processador(self, usar: bool) -> None:
+        """Liga/desliga "usar o processador mesmo com placa de vídeo" e prepara o modelo certo de novo."""
+        with self.lock:
+            if self._ocupado() or self.estado_modelo["fase"] in ("verificando", "baixando", "carregando"):
+                raise Ocupado(erros.MSG_OCUPADO)
+            if usar == self.usar_processador:
+                return
+            self.usar_processador = usar
+            self._hw, self.modelo, self.hardware = None, None, {}
+            self.estado_modelo.update(fase="verificando", progresso=0.0, baixado_mb=0.0, erro="")
+        try:
+            self.saidas.mkdir(parents=True, exist_ok=True)
+            self._arquivo_preferencias().write_text(json.dumps({"usar_processador": usar}), encoding="utf-8")
+        except OSError as e:
+            erros.registrar(self.saidas, e)
+        self._pub()
+        self.iniciar()
 
     # ---------- modelo ----------
     def iniciar(self) -> None:

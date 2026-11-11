@@ -42,6 +42,10 @@ class PedidoGravacao(BaseModel):
     microfone: str = ""
 
 
+class PedidoProcessador(BaseModel):
+    usar: bool = False
+
+
 class PedidoAtualizar(BaseModel):
     confirmado: bool = False
 
@@ -65,9 +69,11 @@ def _sse(tipo: str, dados: dict) -> str:
 
 
 def servico_padrao() -> Servico:
-    hw = lambda: detectar_hardware(config.forcar_cpu(), config.modelo_forcado(), config.cpu_threads())  # noqa: E731
+    hw = lambda: detectar_hardware(config.forcar_cpu(), config.modelo_forcado(), config.cpu_threads(),  # noqa: E731
+                                   servico.usar_processador)
     dispositivos = DispositivosSimulados() if config.captura_simulada() else None
-    return Servico(config.pasta_saidas(), cache_dir=config.pasta_modelos(), detectar=hw, dispositivos=dispositivos)
+    servico = Servico(config.pasta_saidas(), cache_dir=config.pasta_modelos(), detectar=hw, dispositivos=dispositivos)
+    return servico
 
 
 ARQ_ENCERRAMENTO = ".encerrado-normalmente"
@@ -134,6 +140,14 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
 
         return StreamingResponse(gerar(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.post("/api/hardware/processador")
+    def usar_processador(pedido: PedidoProcessador):
+        try:
+            servico.definir_usar_processador(pedido.usar)
+        except Ocupado as e:
+            raise HTTPException(409, str(e))
+        return {"ok": True}
 
     @app.post("/api/modelo/baixar")
     def baixar_modelo():

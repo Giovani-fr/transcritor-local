@@ -126,3 +126,9 @@ def test_api_youtube_antes_do_modelo_pronto(tmp_path):
     with TestClient(criar_app(sv, iniciar=False)) as c:
         r = c.post("/api/youtube", json={"url": URL, "modo": "rapido"})
         assert r.status_code == 409 and r.json()["detail"] == erros.MSG_NAO_PRONTO
+
+
+def test_api_usar_processador_recusa_durante_trabalho_e_aceita_parado(cliente):
+    r = cliente.post("/api/hardware/processador", json={"usar": True})
+    assert r.status_code == 200 and r.json() == {"ok": True}
+    cliente.post("/api/hardware/processador", json={"usar": False})

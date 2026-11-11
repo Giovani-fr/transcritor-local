@@ -205,8 +205,26 @@
     $("#hw-detalhe").textContent = h.detalhe || "";
     mostrar($("#hw-detalhe"), aberto);
     if (tem) { try { localStorage.setItem("hwVisto", "1"); } catch (e) { /* ok */ } }   // nas próximas vezes abre recolhido
+    mostrar($("#hw-copiar"), !!h.comando);
+    // "Usar o processador mesmo com placa de vídeo" (em Avançado, nas três abas): só aparece com placa utilizável
+    for (const opcao of document.querySelectorAll(".opcao-cpu")) {
+      opcao.hidden = !h.pode_escolher_cpu;
+      opcao.querySelector("input").checked = !!h.usar_processador;
+    }
   }
   $("#hw-mais").addEventListener("click", () => { estado.hwAberto = !estado.hwAberto; renderBanner(); });
+  $("#hw-copiar").addEventListener("click", () => copiar(estado.hardware.comando, "Comando copiado!"));
+  for (const caixa of document.querySelectorAll(".chk-cpu")) {
+    caixa.addEventListener("change", async () => {
+      const usar = caixa.checked;
+      try {
+        const r = await fetch("/api/hardware/processador", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usar }) });
+        if (!r.ok) { const d = await r.json(); aviso(d.detail || "Não consegui trocar agora."); }
+      } catch (e) { aviso(MSG_ENCERRADO); }
+      renderBanner();         // volta a caixa ao valor real se o pedido foi recusado
+    });
+  }
 
   function renderAbas() {
     for (const b of document.querySelectorAll(".aba[data-aba]")) {

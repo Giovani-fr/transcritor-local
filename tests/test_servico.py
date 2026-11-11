@@ -250,3 +250,63 @@ def test_historico_marca_interrompido_e_ignora_pasta_vazia(tmp_path):
     assert h.listar() == []                                    # sem texto ainda: não aparece
     (pasta / "transcricao.txt").write_text("[00:00:01] oi\n", encoding="utf-8")
     assert h.listar()[0]["status"] == "interrompido"           # programa fechado no meio
+
+
+# ---------- hardware: avisos da placa e opção "usar o processador" ----------
+def test_descricao_placa_sem_bibliotecas_tem_comando_para_copiar():
+    from transcritor.servico import descrever_hardware
+    d = descrever_hardware(Hardware(False, "small", "cpu", "int8", "NVIDIA RTX", 16, hardware_msg(), placa_sem_cuda=True))
+    assert d["mensagem"].startswith("Encontrei sua placa Nvidia, mas faltam as bibliotecas")
+    assert d["comando"] == "pip install -r requirements-gpu.txt" and d["pode_escolher_cpu"] is False
+
+
+def hardware_msg():
+    from transcritor.hardware import AVISO_SEM_BIBLIOTECAS
+    return AVISO_SEM_BIBLIOTECAS
+
+
+def test_descricao_sem_placa_nao_tem_comando():
+    from transcritor.servico import descrever_hardware
+    d = descrever_hardware(Hardware(False, "small", "cpu", "int8", "", 16, "x"))
+    assert d["comando"] == "" and "Sem placa de vídeo Nvidia" in d["mensagem"]
+
+
+def test_opcao_usar_processador_so_aparece_com_placa_utilizavel():
+    from transcritor.servico import descrever_hardware
+    gpu = Hardware(True, "large-v3-turbo", "cuda", "int8_float16", "NVIDIA RTX", 16)
+    assert descrever_hardware(gpu)["pode_escolher_cpu"] is True
+    assert descrever_hardware(gpu.como_cpu())["pode_escolher_cpu"] is False
+
+
+def test_trocar_para_processador_recarrega_o_modelo_e_lembra_a_escolha(tmp_path):
+    from transcritor.hardware import AVISO_CPU_ESCOLHA
+    gpu = Hardware(True, "large-v3-turbo", "cuda", "int8_float16", "NVIDIA RTX", 16)
+    detectar = lambda: Hardware(False, "small", "cpu", "int8", "NVIDIA RTX", 16, AVISO_CPU_ESCOLHA, escolha_cpu=True) \
+        if s.usar_processador else gpu
+    s = Servico(tmp_path / "saidas", detectar=detectar, instalado=lambda n, c=None: True,
+                carregar=lambda hw, c=None: (ModeloFalso(), hw))
+    s.iniciar()
+    esperar(lambda: s.estado_modelo["fase"] == "pronto")
+    assert s.hardware["usa_gpu"] and s.hardware["pode_escolher_cpu"]
+
+    s.definir_usar_processador(True)
+    esperar(lambda: s.estado_modelo["fase"] == "pronto" and s.hardware.get("usar_processador"))
+    assert not s.hardware["usa_gpu"] and s.estado_modelo["nome"] == "small" and s.hardware["pode_escolher_cpu"]
+    assert (tmp_path / "saidas" / "preferencias.json").exists()
+
+    outro = Servico(tmp_path / "saidas", detectar=detectar, instalado=lambda n, c=None: True)   # novo início
+    assert outro.usar_processador is True                                                       # lembrou
+
+    s.definir_usar_processador(False)
+    esperar(lambda: s.estado_modelo["fase"] == "pronto" and s.hardware.get("usa_gpu"))
+    assert s.estado_modelo["nome"] == "large-v3-turbo"
+
+
+def test_nao_troca_para_processador_com_trabalho_em_andamento(tmp_path):
+    s = Servico(tmp_path / "saidas", HW, instalado=lambda n, c=None: True,
+                carregar=lambda hw, c=None: (ModeloFalso(), hw))
+    s.iniciar()
+    esperar(lambda: s.estado_modelo["fase"] == "pronto")
+    s.trabalho = {"fase": "transcrevendo"}
+    with pytest.raises(Ocupado):
+        s.definir_usar_processador(True)

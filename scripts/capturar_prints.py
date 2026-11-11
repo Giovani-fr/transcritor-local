@@ -37,12 +37,14 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 import transcritor.servico as sv_mod  # noqa: E402
 from transcritor import youtube as ytmod  # noqa: E402
 from transcritor.captura import MSG_NAO_WINDOWS, DispositivosSimulados  # noqa: E402
-from transcritor.hardware import AVISO_CPU, MODELO_GPU, Hardware  # noqa: E402
+from transcritor.hardware import AVISO_CPU, AVISO_SEM_BIBLIOTECAS, MODELO_GPU, Hardware  # noqa: E402
 from transcritor.servico import Servico  # noqa: E402
 from transcritor.web.app import criar_app  # noqa: E402
 
 GPU = Hardware(True, MODELO_GPU, "cuda", "int8_float16", "NVIDIA GeForce RTX 3050 Laptop GPU", 15.7)
 CPU = Hardware(False, "small", "cpu", "int8", ram_gb=15.7, aviso=AVISO_CPU)
+SEM_BIBLIOTECAS = Hardware(False, "small", "cpu", "int8", "NVIDIA GeForce RTX 3050 Laptop GPU", 15.7,
+                           AVISO_SEM_BIBLIOTECAS, placa_sem_cuda=True)
 
 FRASES = [
     ("Bom dia, pessoal. Vamos começar a reunião de hoje.", "Primeiro, um resumo do que ficou combinado na semana passada."),
@@ -563,6 +565,26 @@ def sem_placa_de_video(shot, nav, srv, audio):
     ctx.close()
 
 
+def placa_sem_bibliotecas(shot, nav, srv):
+    """Há placa Nvidia, mas faltam as bibliotecas CUDA: aviso com o comando e o botão "Copiar comando"."""
+    ctx = nav.new_context(viewport={"width": 1000, "height": 900}, locale="pt-BR", color_scheme="light")
+    pg = ctx.new_page()
+    abrir(pg, srv.base)
+    assert pg.is_visible("#hw-copiar") and "requirements-gpu.txt" in pg.inner_text("#hw-msg")
+    assert not pg.is_visible(".opcao-cpu")                  # sem CUDA utilizável, não há o que trocar
+    shot(pg, "57-aviso-placa-sem-bibliotecas")
+    ctx.close()
+
+
+def avancado_usar_processador(shot, pg, srv):
+    """Com placa utilizável, "Avançado" oferece usar o processador (desligado por padrão)."""
+    abrir(pg, srv.base)
+    pg.click("#inicio-arquivo summary")
+    caixa = pg.locator("#inicio-arquivo .chk-cpu")
+    assert caixa.is_visible() and not caixa.is_checked()
+    shot(pg, "58-avancado-usar-processador")
+
+
 # ----------------------------------------------------------------------------- principal
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -588,6 +610,7 @@ def main():
 
         gpu = Servidor(tmp, "gpu", GPU)
         cpu = Servidor(tmp, "cpu", CPU).iniciar()
+        semlib = Servidor(tmp, "semlib", SEM_BIBLIOTECAS).iniciar()
         with sync_playwright() as p:
             try:
                 nav = p.chromium.launch()
@@ -602,15 +625,18 @@ def main():
             aba_youtube(shot, pg, gpu)
             aba_gravar(shot, pg, gpu)
             atualizar_ytdlp(shot, pg, gpu)
+            avancado_usar_processador(shot, pg, gpu)
             celular(shot, nav, gpu, True)
             sem_placa_de_video(shot, nav, cpu, audio)
+            placa_sem_bibliotecas(shot, nav, semlib)
             assert not erros_js, f"erros de JavaScript: {erros_js}"
             nav.close()
         gpu.parar()
         cpu.parar()
+        semlib.parar()
 
         numeros = sorted(int(n[:2]) for n in shot.feitos)
-        faltando = sorted(set(range(1, 57)) - set(numeros) - {15})
+        faltando = sorted(set(range(1, 59)) - set(numeros) - {15})
         assert not faltando, f"prints que não foram gerados: {faltando}"
         destino.mkdir(parents=True, exist_ok=True)
         for velho in destino.glob("*.png"):
