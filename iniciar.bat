@@ -11,11 +11,16 @@ if not exist "%VENV%\Scripts\python.exe" (
 cd /d "%~dp0"
 set "PYTHONPATH=%~dp0src"
 set "REINICIOS=0"
+rem O programa deixa esta marca quando e encerrado de proposito (Ctrl+C ou fechar); uma queda nao deixa.
+set "MARCA=%~dp0saidas\.encerrado-normalmente"
 rem abre o navegador depois de 2 s, quando o servidor ja estiver no ar
 start "" cmd /c "timeout /t 2 /nobreak >nul & start http://127.0.0.1:8765"
 
 :rodar
+if exist "%MARCA%" del "%MARCA%" >nul 2>&1
 "%VENV%\Scripts\python.exe" -X utf8 -m uvicorn transcritor.web.app:app --host 127.0.0.1 --port 8765
+rem Encerrou de proposito (marca existe) ou sem erro: nao reinicia. So reinicia em falha.
+if exist "%MARCA%" goto fim
 if not errorlevel 1 goto fim
 set /a REINICIOS+=1
 if %REINICIOS% GTR 5 goto desistiu

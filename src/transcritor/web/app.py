@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -69,6 +70,22 @@ def servico_padrao() -> Servico:
     return Servico(config.pasta_saidas(), cache_dir=config.pasta_modelos(), detectar=hw, dispositivos=dispositivos)
 
 
+ARQ_ENCERRAMENTO = ".encerrado-normalmente"
+
+
+def marcar_encerramento_normal(saidas: Path) -> None:
+    """Deixa um arquivo-marca quando o programa é encerrado de propósito (Ctrl+C, fechar).
+
+    O iniciar.bat só reinicia sozinho se essa marca NÃO existir: uma queda (erro, crash) nunca passa
+    pelo encerramento normal e, portanto, não deixa a marca.
+    """
+    try:
+        Path(saidas).mkdir(parents=True, exist_ok=True)
+        (Path(saidas) / ARQ_ENCERRAMENTO).write_text(time.strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
     difusor = Difusor()
     servico = servico or servico_padrao()
@@ -83,6 +100,7 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
         servico.encerrar()
         if iniciar:
             diagnostico.desativar()
+            marcar_encerramento_normal(servico.saidas)
 
     app = FastAPI(title="transcritor-local", lifespan=vida)
     app.state.servico = servico
