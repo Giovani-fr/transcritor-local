@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import itertools
 import multiprocessing
+import signal
 import threading
 import time
 import traceback
@@ -32,7 +33,14 @@ VALIDADE_LISTA_S = 5.0      # a lista de dispositivos fica em cache por alguns s
 
 # ====================== lado do filho ======================
 def principal_filho(conn, fabrica, saidas: str | None) -> None:
-    """Corpo do processo de captura. ``fabrica()`` devolve o objeto de dispositivos (Wasapi ou falso)."""
+    """Corpo do processo de captura. ``fabrica()`` devolve o objeto de dispositivos (Wasapi ou falso).
+
+    O Ctrl+C do console chega a TODOS os processos da janela. O filho o ignora: ele só termina quando o
+    servidor pede ("sair") ou morre (o pipe fecha), sem imprimir traceback.
+    """
+    for nome in ("SIGINT", "SIGBREAK"):
+        if hasattr(signal, nome):
+            signal.signal(getattr(signal, nome), signal.SIG_IGN)
     if saidas:
         from . import diagnostico
         diagnostico.ativar(Path(saidas), "crash-captura.log")
@@ -55,7 +63,7 @@ def principal_filho(conn, fabrica, saidas: str | None) -> None:
                         if (sid, c.rotulo) not in avisadas and not c.ativa():
                             avisadas.add((sid, c.rotulo))
                             conn.send(("perdeu", sid, c.rotulo))
-            except (EOFError, OSError):         # o servidor foi embora: não deixa processo órfão
+            except (EOFError, OSError, KeyboardInterrupt):   # o servidor foi embora: não deixa processo órfão
                 return
     finally:
         for conjunto in sessoes.values():
@@ -74,6 +82,9 @@ def _tratar(conn, backend, sessoes: dict, msg: tuple) -> None:
             conjunto = backend.abrir(fonte, microfone)
             sessoes[sid] = conjunto
             conn.send(("resp", id_, True, [c.rotulo for c in conjunto.capturas]))
+        elif nome == "sinais":                      # só para testes: o Ctrl+C está ignorado aqui?
+            conn.send(("resp", id_, True, {n: signal.getsignal(getattr(signal, n)) == signal.SIG_IGN
+                                           for n in ("SIGINT", "SIGBREAK") if hasattr(signal, n)}))
         elif nome == "fechar":
             conjunto = sessoes.pop(args[0], None)
             if conjunto:

@@ -147,3 +147,26 @@ def test_filho_travado_vira_erro_simples_e_e_encerrado(tmp_path):
         esperar(lambda: not d.processo.viva, 5)
     finally:
         d.encerrar()
+
+
+def test_filho_ignora_ctrl_c_e_sai_quando_o_pai_pede(tmp_path):
+    """O Ctrl+C do console chega ao filho também: ele não pode morrer nem imprimir traceback por causa disso."""
+    d = DispositivosIsolados(DispositivosSimulados, saidas=tmp_path)
+    try:
+        d.microfones()
+        assert d.processo.chamar("sinais") == {"SIGINT": True, "SIGBREAK": True}
+        proc = d.processo._proc
+    finally:
+        d.encerrar()                                    # o pai pede e o filho sai sozinho
+    proc.join(5)
+    assert not proc.is_alive() and proc.exitcode == 0
+
+
+def test_filho_sai_sozinho_se_o_pai_morrer(tmp_path):
+    d = DispositivosIsolados(DispositivosSimulados, saidas=tmp_path)
+    d.microfones()
+    proc, conn = d.processo._proc, d.processo._conn
+    conn.close()                                        # equivale ao servidor ter sumido
+    proc.join(5)
+    assert not proc.is_alive() and proc.exitcode == 0
+    d.processo._proc = None

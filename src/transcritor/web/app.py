@@ -5,8 +5,8 @@ import asyncio
 import json
 import os
 import shutil
+import signal
 import tempfile
-import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -63,6 +63,34 @@ class Difusor:
             except RuntimeError:        # loop já fechado
                 self.assinantes.discard((loop, fila))
 
+    def encerrar(self) -> None:
+        """Manda todas as conexões SSE terminarem (senão o uvicorn espera por elas para sempre ao fechar)."""
+        self.publicar(FIM, {})
+
+
+FIM = "__fim__"
+
+
+def avisar_conexoes_ao_encerrar(difusor: Difusor) -> None:
+    """Quando chega Ctrl+C / Ctrl+Break, encerra as conexões SSE antes de o uvicorn começar a esperar por elas.
+
+    Só encadeia: o tratador original do uvicorn continua rodando em seguida.
+    """
+    for nome in ("SIGINT", "SIGBREAK", "SIGTERM"):
+        sig = getattr(signal, nome, None)
+        if sig is None:
+            continue
+        try:
+            anterior = signal.getsignal(sig)
+
+            def tratador(num, quadro, anterior=anterior):
+                difusor.encerrar()
+                if callable(anterior):
+                    anterior(num, quadro)
+            signal.signal(sig, tratador)
+        except (ValueError, OSError):       # fora da thread principal (testes): não há o que encadear
+            pass
+
 
 def _sse(tipo: str, dados: dict) -> str:
     return f"event: {tipo}\ndata: {json.dumps(dados, ensure_ascii=False)}\n\n"
@@ -76,22 +104,6 @@ def servico_padrao() -> Servico:
     return servico
 
 
-ARQ_ENCERRAMENTO = ".encerrado-normalmente"
-
-
-def marcar_encerramento_normal(saidas: Path) -> None:
-    """Deixa um arquivo-marca quando o programa é encerrado de propósito (Ctrl+C, fechar).
-
-    O iniciar.bat só reinicia sozinho se essa marca NÃO existir: uma queda (erro, crash) nunca passa
-    pelo encerramento normal e, portanto, não deixa a marca.
-    """
-    try:
-        Path(saidas).mkdir(parents=True, exist_ok=True)
-        (Path(saidas) / ARQ_ENCERRAMENTO).write_text(time.strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8")
-    except OSError:
-        pass
-
-
 def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
     difusor = Difusor()
     servico = servico or servico_padrao()
@@ -101,12 +113,13 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
     async def vida(app):
         if iniciar:
             diagnostico.ativar(servico.saidas)        # um crash nativo deixa a pilha em saidas/crash.log
+            avisar_conexoes_ao_encerrar(difusor)
             servico.iniciar()
         yield
+        difusor.encerrar()
         servico.encerrar()
         if iniciar:
             diagnostico.desativar()
-            marcar_encerramento_normal(servico.saidas)
 
     app = FastAPI(title="transcritor-local", lifespan=vida)
     app.state.servico = servico
@@ -134,6 +147,8 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
                     except asyncio.TimeoutError:
                         yield ": ping\n\n"
                         continue
+                    if tipo == FIM:
+                        return
                     yield _sse(tipo, dados)
             finally:
                 difusor.assinantes.discard(par)
