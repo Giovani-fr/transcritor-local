@@ -59,7 +59,7 @@ Grava ao vivo e mostra o texto por trechos de 30 s. A fonte **Reunião** capta o
 | Processador | 4 núcleos | 8 núcleos ou mais |
 | Memória (RAM) | 8 GB | 16 GB |
 | Placa de vídeo | não é obrigatória | Nvidia com 4 GB de memória ou mais |
-| Disco | alguns GB livres (bibliotecas + modelo `small`, ≈ 0,5 GB) | mais alguns GB com a placa de vídeo (bibliotecas CUDA + modelo `large-v3-turbo`, ≈ 1,6 GB) |
+| Disco | ≈ 1 GB livre (bibliotecas ≈ 0,6 GB + modelo `small`, ≈ 0,5 GB) | ≈ 4 GB com a placa de vídeo (bibliotecas CUDA ≈ 2 GB + modelo `large-v3-turbo`, ≈ 1,6 GB) |
 | Internet | só para instalar, baixar o modelo na primeira vez e usar o YouTube | idem |
 
 O mínimo é uma **estimativa**, não uma medição em um PC de 4 núcleos (veja abaixo). Linux e macOS: as abas Arquivo e YouTube
@@ -110,7 +110,8 @@ py -3.12 -m venv "$env:USERPROFILE\venvs\transcritor-local"
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements.txt
 ```
 
-Se o PC tem **placa de vídeo Nvidia** (com o driver atualizado), instale também as bibliotecas CUDA para ela ser usada:
+Se o PC tem **placa de vídeo Nvidia** (com o driver atualizado), instale também as bibliotecas CUDA para ela ser usada
+(baixa cerca de 2 GB e pode levar vários minutos):
 
 ```powershell
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements-gpu.txt
@@ -123,6 +124,8 @@ Se você tem placa Nvidia e esqueceu este comando (ou o driver está antigo), o 
 botão **Copiar comando**, e enquanto isso usa o processador. Só diz *"não encontrei placa Nvidia"* quando não há placa.
 
 **3. Abra o programa:** dê dois cliques em `iniciar.bat`. Ele abre o navegador em `http://127.0.0.1:8765`.
+Para fechar, aperte **Ctrl+C** na janela preta (se ela perguntar *"Deseja finalizar o arquivo em lotes (S/N)?"*, responda **S**).
+Se o programa cair por um erro grave, o `iniciar.bat` o abre de novo sozinho (até 5 vezes); fechar de propósito nunca o reinicia.
 Na primeira vez a tela pede para baixar o modelo (botão **Baixar e começar**; ≈ 0,5 GB no processador, ≈ 1,6 GB com placa de vídeo).
 
 O programa só atende o seu próprio computador (`127.0.0.1`): ninguém na sua rede consegue abrir.
@@ -265,13 +268,15 @@ Contribuições são bem-vindas (issues e pull requests). Para rodar o projeto e
 
 ```powershell
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements-dev.txt
-& "$env:USERPROFILE\venvs\transcritor-local\Scripts\python" -m pytest
+& "$env:USERPROFILE\venvs\transcritor-local\Scripts\python" -m pytest -m "not modelo and not rede"
 ```
 
 - Os testes usam áudio sintético e simulações. Alguns usam o modelo `small` de verdade (baixa ≈ 0,5 GB na primeira vez):
-  `pytest -m "not modelo"` roda só os rápidos. `pytest -m rede` roda o teste opcional com internet.
-- Para testar a aba Gravar sem microfone: `TRANSCRITOR_CAPTURA_SIMULADA=1` usa sinais sintéticos.
-- Para refazer os prints: `python -m playwright install chromium` e `python -I -X utf8 scripts/capturar_prints.py`.
+  o comando acima roda só os rápidos (sem modelo e sem internet). `pytest -m modelo` roda os que usam o modelo e
+  `pytest -m rede` roda o teste opcional com internet. Sem `-m`, roda tudo, menos os de internet.
+- Para testar a aba Gravar sem microfone: `$env:TRANSCRITOR_CAPTURA_SIMULADA = "1"` (antes de abrir o programa) usa sinais sintéticos.
+- Para refazer os prints (use o `python` do ambiente, como acima):
+  `python -m playwright install chromium` e depois `python -I -X utf8 scripts/capturar_prints.py`.
 - **Privacidade:** não envie áudio, gravações nem transcrições reais em issues, pull requests ou prints.
   Use áudio sintético ou conteúdo de domínio público.
 - Mantenha as mensagens da interface em português simples, sem jargão.

@@ -61,7 +61,7 @@ Records live and shows the text in 30 s chunks. The **Reunião** (Meeting) sourc
 | Processor | 4 cores | 8 cores or more |
 | Memory (RAM) | 8 GB | 16 GB |
 | Graphics card | not required | Nvidia with 4 GB of memory or more |
-| Disk | a few GB free (libraries + `small` model, ≈ 0.5 GB) | a few more GB with a graphics card (CUDA libraries + `large-v3-turbo` model, ≈ 1.6 GB) |
+| Disk | ≈ 1 GB free (libraries ≈ 0.6 GB + `small` model, ≈ 0.5 GB) | ≈ 4 GB with a graphics card (CUDA libraries ≈ 2 GB + `large-v3-turbo` model, ≈ 1.6 GB) |
 | Internet | only to install, download the model the first time and use YouTube | same |
 
 The minimum is an **estimate**, not a measurement on a 4-core PC (see below). Linux and macOS: the File and YouTube tabs
@@ -112,7 +112,8 @@ py -3.12 -m venv "$env:USERPROFILE\venvs\transcritor-local"
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements.txt
 ```
 
-If the PC has an **Nvidia graphics card** (with an up-to-date driver), also install the CUDA libraries so it gets used:
+If the PC has an **Nvidia graphics card** (with an up-to-date driver), also install the CUDA libraries so it gets used
+(it downloads about 2 GB and can take several minutes):
 
 ```powershell
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements-gpu.txt
@@ -126,6 +127,8 @@ If you have an Nvidia card and forgot this command (or the driver is old), the p
 meanwhile uses the processor. It only says "I did not find an Nvidia card" when there really is none.
 
 **3. Start the program:** double-click `iniciar.bat`. It opens your browser at `http://127.0.0.1:8765`.
+To quit, press **Ctrl+C** in the black window (if it asks *"Deseja finalizar o arquivo em lotes (S/N)?"* — "Terminate batch job?" — answer **S** for yes).
+If the program crashes with a serious error, `iniciar.bat` starts it again on its own (up to 5 times); quitting on purpose never restarts it.
 The first time, the screen asks you to download the model (**Baixar e começar** button; ≈ 0.5 GB on the processor,
 ≈ 1.6 GB with a graphics card).
 
@@ -270,13 +273,15 @@ Contributions are welcome (issues and pull requests). To run the project in deve
 
 ```powershell
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements-dev.txt
-& "$env:USERPROFILE\venvs\transcritor-local\Scripts\python" -m pytest
+& "$env:USERPROFILE\venvs\transcritor-local\Scripts\python" -m pytest -m "not modelo and not rede"
 ```
 
 - Tests use synthetic audio and simulations. A few use the real `small` model (downloads ≈ 0.5 GB the first time):
-  `pytest -m "not modelo"` runs only the fast ones. `pytest -m rede` runs the optional internet test.
-- To try the Record tab without a microphone: `TRANSCRITOR_CAPTURA_SIMULADA=1` uses synthetic signals.
-- To regenerate the screenshots: `python -m playwright install chromium` and `python -I -X utf8 scripts/capturar_prints.py`.
+  the command above runs only the fast ones (no model, no internet). `pytest -m modelo` runs the ones that use the model and
+  `pytest -m rede` runs the optional internet test. Without `-m`, everything runs except the internet test.
+- To try the Record tab without a microphone: `$env:TRANSCRITOR_CAPTURA_SIMULADA = "1"` (before starting the program) uses synthetic signals.
+- To regenerate the screenshots (use the environment's `python`, as above):
+  `python -m playwright install chromium`, then `python -I -X utf8 scripts/capturar_prints.py`.
 - **Privacy:** do not post real audio, recordings or transcripts in issues, pull requests or screenshots.
   Use synthetic audio or public-domain content.
 - Keep interface messages in plain Portuguese, without jargon.
