@@ -20,7 +20,8 @@ processador (veja [Funciona sem placa de vídeo?](#funciona-sem-placa-de-vídeo)
 | ✅ Testado | abas **Arquivo** e **YouTube**, a interface, o motor e os testes automáticos (com áudio sintético) |
 | ✅ Testado com microfone real | aba **Gravar**, modo **Ambiente**: gravação de 29 s em 11/11/2026, com o texto correto |
 | ✅ Testado só com captura simulada | aba **Gravar**: níveis, trechos, atraso, áudio salvo e erros de dispositivo |
-| ⏳ **Pendente** | **Gravar no modo Reunião** (som do computador + microfone): ainda não foi confirmado no hardware real |
+| ✅ Testado com som do sistema real | aba **Gravar**, modo **Reunião**: gravação de 1 min 6 s em 11/11/2026 com um vídeo tocando no computador (modelo `large-v3-turbo`): áudio guardado na pasta e texto com horários, correto |
+| ⏳ **Não testado** | Meet, Zoom e Teams um a um; e o microfone captado junto com o som do sistema no modo Reunião |
 
 ## Sumário
 
@@ -44,14 +45,16 @@ baixa só o áudio, transcreve com o Whisper e, por padrão, **apaga o áudio ao
 
 ### Gravar
 Grava ao vivo e mostra o texto por trechos de 30 s. A fonte **Reunião** capta o som do computador mais o microfone
-(serve para Meet, Zoom e Teams); **Ambiente** capta só o microfone. O áudio original é guardado em blocos de 10 min.
+(deve servir para Meet, Zoom e Teams, que tocam o som pelo Windows; não foram testados um a um); **Ambiente** capta só o microfone. O áudio original é guardado em blocos de 10 min.
 
 <img src="docs/prints/43-gravando-texto-ao-vivo.png" alt="Aba Gravar gravando uma reunião, com medidores de nível e texto ao vivo" width="560">
 
 > ✅ O modo **Ambiente** (só o microfone) foi testado com um microfone real em 11/11/2026: uma gravação de 29 s saiu
 > com o texto correto.
-> ⏳ **Pendente:** o modo **Reunião** (som do computador + microfone) ainda não foi confirmado no hardware real;
-> até ser confirmado, trate-o como experimental.
+> ✅ O modo **Reunião** foi testado em 11/11/2026 com o **som do computador**: uma gravação de 1 min 6 s de um vídeo
+> tocando no PC (modelo `large-v3-turbo`) deixou o áudio guardado na pasta e o texto, com horários, correto.
+> ⏳ **Não testado:** Meet, Zoom e Teams individualmente (o programa capta o som que o Windows toca na saída padrão, então
+> deve funcionar com eles, mas isso não foi verificado um a um) e o microfone captado ao mesmo tempo que o som do sistema.
 
 ## Requisitos
 
@@ -183,8 +186,8 @@ O aviso aparece aberto na primeira vez e fica recolhido depois ("Saiba mais" mos
 5. **Parar gravação** termina e processa o último pedaço. O áudio original fica salvo na pasta da gravação, em blocos de 10 min,
    e nunca é apagado.
 
-> ✅ **Ambiente** testado com microfone real (11/11/2026). ⏳ **Pendente:** o modo **Reunião** ainda não foi confirmado
-> com o som do sistema real.
+> ✅ **Ambiente** testado com microfone real e **Reunião** testado com o som do computador (um vídeo tocando), ambos em
+> 11/11/2026. ⏳ **Não testado:** Meet, Zoom e Teams um a um, e o microfone junto com o som do sistema.
 
 O tema claro/escuro segue o do sistema (e há um botão para trocar), e o layout se adapta a janelas estreitas.
 
@@ -220,8 +223,8 @@ Estrutura: `src/transcritor/` (motor, serviço, captura, YouTube, web), `tests/`
 
 - **Não separa falantes:** o texto sai corrido, sem "Pessoa 1 / Pessoa 2".
 - **Gravação ao vivo só no Windows** (captura WASAPI). Em outros sistemas a aba Gravar avisa que não está disponível.
-- **O modo Reunião da aba Gravar ainda não foi testado com o som do sistema real** (o modo Ambiente, com microfone real, foi;
-  veja o estado do projeto, no começo).
+- **Reunião:** testado com o som do computador (um vídeo tocando), mas **não** com Meet, Zoom e Teams um a um, e a captação do
+  microfone ao mesmo tempo que o som do sistema não foi confirmada (veja o estado do projeto, no começo).
 - **Modelos pequenos alucinam mais em processador.** Sobre ruído, o `base` inventou "E aí!" e o `small` já inventou um crédito
   de legenda (hoje filtrado) nos testes com ruído sintético; a placa de vídeo com `large-v3-turbo` não inventou nada. O filtro
   descarta as alucinações conhecidas, mas frases curtas e plausíveis ainda podem passar.
