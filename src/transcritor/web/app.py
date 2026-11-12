@@ -40,6 +40,7 @@ class PedidoYoutube(BaseModel):
 class PedidoGravacao(BaseModel):
     fonte: str = "reuniao"
     microfone: str = ""
+    idioma: str = "pt"
 
 
 class PedidoProcessador(BaseModel):
@@ -240,10 +241,10 @@ def criar_app(servico: Servico | None = None, iniciar: bool = True) -> FastAPI:
 
     @app.post("/api/gravacao")
     def iniciar_gravacao(pedido: PedidoGravacao):
-        if pedido.fonte not in FONTES:
+        if pedido.fonte not in FONTES or pedido.idioma not in IDIOMAS:
             raise HTTPException(400, "Opção não reconhecida.")
         try:
-            return {"id": servico.iniciar_gravacao(pedido.fonte, pedido.microfone)}
+            return {"id": servico.iniciar_gravacao(pedido.fonte, pedido.microfone, IDIOMAS[pedido.idioma])}
         except ErroCaptura as e:
             return _erro_captura(e)
         except (Ocupado, NaoPronto) as e:

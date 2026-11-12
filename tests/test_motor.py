@@ -45,8 +45,23 @@ def test_parametros_que_evitam_loop_de_reticencias():
     motor.processar_trecho(Falso(), np.full(16000, 0.1, np.float32), 0.0)
     assert chamadas["condition_on_previous_text"] is False
     assert "initial_prompt" not in chamadas
-    assert chamadas["language"] == "pt" and chamadas["vad_filter"] is True
-    assert chamadas["vad_parameters"] == motor.VAD
+    assert chamadas["language"] == "pt" and chamadas["multilingual"] is False
+    assert chamadas["vad_filter"] is True and chamadas["vad_parameters"] == motor.VAD
+
+
+def test_processar_trecho_respeita_idioma_e_ativa_multilingual_no_auto():
+    chamadas = []
+
+    class Falso:
+        def transcribe(self, audio, **kw):
+            chamadas.append(kw)
+            return iter([]), None
+
+    x = np.full(16000, 0.1, np.float32)
+    motor.processar_trecho(Falso(), x, 0.0, idioma="en")
+    motor.processar_trecho(Falso(), x, 0.0, idioma=None)
+    assert chamadas[0]["language"] == "en" and chamadas[0]["multilingual"] is False
+    assert chamadas[1]["language"] is None and chamadas[1]["multilingual"] is True
 
 
 def test_processar_trecho_filtra_alucinacao_e_marca_fundo():

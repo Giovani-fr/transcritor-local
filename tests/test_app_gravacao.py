@@ -51,7 +51,31 @@ def test_fluxo_de_gravacao_pela_api(cliente):
 
 def test_fonte_invalida(cliente):
     assert cliente.post("/api/gravacao", json={"fonte": "lua"}).status_code == 400
+    assert cliente.post("/api/gravacao", json={"fonte": "ambiente", "idioma": "klingon"}).status_code == 400
     assert cliente.post("/api/gravacao/previa", json={"fonte": "lua"}).status_code == 400
+
+
+def test_gravacao_repassa_idioma_escolhido_ao_modelo(tmp_path):
+    idiomas_vistos = []
+
+    class ModeloEspiao(ModeloFalso):
+        def transcribe(self, audio, **kw):
+            idiomas_vistos.append((kw.get("language"), kw.get("multilingual")))
+            return super().transcribe(audio, **kw)
+
+    s = Servico(tmp_path / "saidas", HW, instalado=lambda n, c=None: True,
+                carregar=lambda hw, c=None: (ModeloEspiao(), hw), dispositivos=Dispositivos())
+    s.iniciar()
+    esperar(lambda: s.estado_modelo["fase"] == "pronto")
+    with TestClient(criar_app(s, iniciar=False)) as c:
+        for pedido, esperado in (("en", ("en", False)), ("auto", (None, True))):
+            idiomas_vistos.clear()
+            r = c.post("/api/gravacao", json={"fonte": "ambiente", "idioma": pedido})
+            assert r.status_code == 200
+            esperar(lambda: s.trabalho["fase"] == "gravando" and s.trabalho["gravado_s"] >= 3)
+            c.post("/api/parar")
+            esperar(lambda: s.trabalho["fase"] == "concluido")
+            assert idiomas_vistos == [esperado]
 
 
 def test_sem_microfone_devolve_mensagem_simples(tmp_path):

@@ -557,8 +557,10 @@
   try {
     const i = localStorage.getItem("idioma"); if (i) $("#idioma").value = i;
     const y = localStorage.getItem("ytIdioma"); if (y) $("#yt-idioma").value = y;
+    const g = localStorage.getItem("gravIdioma"); if (g) $("#grav-idioma").value = g;
   } catch (e) { /* ok */ }
   $("#yt-idioma").addEventListener("change", (e) => { try { localStorage.setItem("ytIdioma", e.target.value); } catch (x) { /* ok */ } });
+  $("#grav-idioma").addEventListener("change", (e) => { try { localStorage.setItem("gravIdioma", e.target.value); } catch (x) { /* ok */ } });
   /* ---------- aba Gravar ---------- */
   const NOMES_MEDIDOR = { mic: "Seu microfone", sistema: "Som do computador" };
   const AVISOS_MEDIDOR = {
@@ -698,9 +700,10 @@
     estado.grav.confirmando = false; estado.grav.erro = "";
     botao.disabled = true;
     try {
-      try { localStorage.setItem("gravFonte", fonteAtual()); localStorage.setItem("gravMic", micAtual()); } catch (e) { /* ok */ }
+      const idioma = $("#grav-idioma").value;
+      try { localStorage.setItem("gravFonte", fonteAtual()); localStorage.setItem("gravMic", micAtual()); localStorage.setItem("gravIdioma", idioma); } catch (e) { /* ok */ }
       const r = await fetch("/api/gravacao", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fonte: fonteAtual(), microfone: micAtual() }) });
+        body: JSON.stringify({ fonte: fonteAtual(), microfone: micAtual(), idioma }) });
       if (r.ok) { estado.dispensado = null; return; }
       const d = await r.json();
       if (r.status === 409) aviso(d.detail); else estado.grav.erro = d.detail || "Não consegui começar a gravar.";

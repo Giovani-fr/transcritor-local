@@ -11,15 +11,24 @@ import numpy as np
 
 # Frases que o Whisper costuma inventar sobre ruído/silêncio (minúsculas, sem pontuação).
 ALUCINACOES = {
+    # português
     "obrigado", "obrigada", "obrigado a todos", "muito obrigado", "tchau",
     "tchau tchau", "até a próxima", "até o próximo vídeo", "inscreva-se",
     "legendas pela comunidade amara.org", "legenda adriana zanotto",
+    # inglês
+    "thank you", "thank you very much", "thanks for watching", "thank you for watching",
+    "bye", "bye bye", "see you next time", "subscribe",
+    # espanhol
+    "gracias", "muchas gracias", "hasta la próxima",
 }
 
 
-# Créditos de legenda inventados ("Legendas por Fulano", "Tradução e legendas pela comunidade...").
-# Só em linhas curtas, para não descartar fala real que comece com "legendas ...".
-_CREDITO = re.compile(r"^(tradu[cç][aã]o e )?legendas? (por|pela|pelo)\b|amara\.org", re.IGNORECASE)
+# Créditos de legenda inventados ("Legendas por Fulano", "Subtitles by...", "Tradução e legendas...").
+# Só em linhas curtas, para não descartar fala real que comece com "legendas ..." / "subtitles ...".
+_CREDITO = re.compile(
+    r"^((tradu[cç][aã]o e )?legendas? (por|pela|pelo)|subtitles? by|captions? by|subt[ií]tulos? por)\b|amara\.org",
+    re.IGNORECASE,
+)
 _CREDITO_MAX_CHARS = 60
 
 

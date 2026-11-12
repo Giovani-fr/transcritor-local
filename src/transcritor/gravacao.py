@@ -87,14 +87,14 @@ class Gravacao:
     def __init__(self, conjunto: ConjuntoCaptura, pasta: str, modelo, parar: threading.Event, *,
                  ao_linha: Callable[[Linha], None], ao_erro: Callable[[float, BaseException], None],
                  ao_nivel: AoNivel, ao_progresso: Callable[[float, float, int], None],
-                 processar: Callable = processar_trecho, trecho_s: float = TRECHO_S,
-                 bloco_s: float = WAV_BLOCK_S, passo_s: float = PASSO_S):
+                 processar: Callable = processar_trecho, idioma: str | None = "pt",
+                 trecho_s: float = TRECHO_S, bloco_s: float = WAV_BLOCK_S, passo_s: float = PASSO_S):
         self.conjunto, self.pasta, self.parar = conjunto, pasta, parar
         self.ao_nivel, self.ao_progresso = ao_nivel, ao_progresso
         self.trecho_amostras = int(trecho_s * TARGET_SR)
         self.bloco_s, self.passo_s = bloco_s, passo_s
         self.trabalhador = TrabalhadorTranscricao(
-            modelo, processar=processar, ao_linha=ao_linha, ao_erro=ao_erro, ao_concluir=self._concluiu)
+            modelo, processar=processar, idioma=idioma, ao_linha=ao_linha, ao_erro=ao_erro, ao_concluir=self._concluiu)
         self.transcrito_ate = 0.0       # segundos de áudio já transcritos
         self.gravado_s = 0.0
 

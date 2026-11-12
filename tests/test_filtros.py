@@ -6,7 +6,10 @@ from transcritor.filtros import DetectorFundo, eh_alucinacao
 @pytest.mark.parametrize("texto", ["Obrigado.", "obrigado", "Obrigado!", "Tchau.", "Muito obrigado.",
                                    "Legendas pela comunidade Amara.org", "...", "... ... ...",
                                    "  ", "", "…", "- .", "Legendas por Paulo Montenegro",
-                                   "Tradução e legendas pela comunidade"])
+                                   "Tradução e legendas pela comunidade",
+                                   "Thank you.", "Thanks for watching!", "Thank you for watching.",
+                                   "Subtitles by Amara.org", "Subtitles by John Doe", "Captions by team",
+                                   "Gracias.", "Muchas gracias.", "Subtítulos por la comunidad"])
 def test_descarta_alucinacoes_e_pontuacao(texto):
     assert eh_alucinacao(texto)
 
@@ -14,7 +17,9 @@ def test_descarta_alucinacoes_e_pontuacao(texto):
 @pytest.mark.parametrize("texto", ["Clica em renomear.", "Obrigado, então você seleciona o material.",
                                    "Tá selecionado já.", "Tchau, pessoal, até amanhã.",
                                    "Legendas de filmes ajudam muito a aprender idiomas",
-                                   "As legendas por padrão ficam desligadas, então você precisa ativar no menu de configurações do player."])
+                                   "As legendas por padrão ficam desligadas, então você precisa ativar no menu de configurações do player.",
+                                   "Thank you for coming to today's lecture on machine learning.",
+                                   "The subtitles by default are disabled in this video player so you need to enable them in settings."])
 def test_mantem_fala_real(texto):
     assert not eh_alucinacao(texto)
 

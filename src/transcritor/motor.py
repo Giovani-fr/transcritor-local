@@ -77,14 +77,19 @@ def carregar_modelo(hw: Hardware | None = None, cache_dir: str | None = None):
 
 
 def processar_trecho(modelo, audio: np.ndarray, t0: float,
-                     detector: DetectorFundo | None = None) -> list[Linha]:
-    """Transcreve um trecho (ex.: 30 s de gravação ao vivo) e devolve as linhas."""
+                     detector: DetectorFundo | None = None,
+                     idioma: str | None = "pt") -> list[Linha]:
+    """Transcreve um trecho (ex.: 30 s de gravação ao vivo) e devolve as linhas.
+
+    ``idioma=None`` detecta o idioma a cada segmento (``multilingual=True``), útil quando
+    há mais de um idioma alternando na mesma reunião ou aula.
+    """
     detector = detector if detector is not None else DetectorFundo()
     audio_n = normalizar_para_whisper(audio)
     if audio_n is None:
         return []
     segs, _ = modelo.transcribe(
-        audio_n, language="pt", vad_filter=True, vad_parameters=dict(VAD),
+        audio_n, language=idioma, multilingual=idioma is None, vad_filter=True, vad_parameters=dict(VAD),
         condition_on_previous_text=False, no_speech_threshold=0.8, log_prob_threshold=-1.5)
     linhas = []
     for s in segs:
@@ -107,9 +112,9 @@ def transcrever_arquivo(modelo, caminho: str, idioma: str | None = "pt",
                         ao_progresso: Callable[[float, float], None] | None = None) -> Iterator[Linha]:
     """Transcreve um áudio/vídeo existente, gerando as linhas conforme ficam prontas.
 
-    ``idioma=None`` detecta o idioma sozinho. ``ao_progresso(segundos_feitos, duracao)`` é
-    chamado a cada trecho (e uma vez no começo, quando a duração já é conhecida).
-    ``parar`` interrompe entre dois trechos; o que já saiu continua valendo.
+    ``idioma=None`` detecta o idioma sozinho a cada segmento (``multilingual=True``).
+    ``ao_progresso(segundos_feitos, duracao)`` é chamado a cada trecho (e uma vez no começo,
+    quando a duração já é conhecida). ``parar`` interrompe entre dois trechos; o que já saiu continua valendo.
     """
     from faster_whisper.audio import decode_audio
     try:
@@ -125,7 +130,7 @@ def transcrever_arquivo(modelo, caminho: str, idioma: str | None = "pt",
     if audio_n is None or (parar and parar.is_set()):
         return
     segs, _ = modelo.transcribe(
-        audio_n, language=idioma, vad_filter=True, vad_parameters=dict(VAD),
+        audio_n, language=idioma, multilingual=idioma is None, vad_filter=True, vad_parameters=dict(VAD),
         condition_on_previous_text=False)
     for s in segs:
         if parar and parar.is_set():

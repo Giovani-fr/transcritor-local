@@ -472,7 +472,8 @@ class Servico:
         with self._lock_previa:
             self._parar_previa()
 
-    def iniciar_gravacao(self, fonte: str, microfone: str | None = None) -> str:
+    def iniciar_gravacao(self, fonte: str, microfone: str | None = None,
+                         idioma: str | None = "pt") -> str:
         self._validar_fonte(fonte)
         with self.lock:
             if self.estado_modelo["fase"] != "pronto" or self.modelo is None:
@@ -488,10 +489,11 @@ class Servico:
             conjunto.fechar()
             raise
         threading.Thread(target=self._executar, daemon=True, args=(
-            id_, pasta, parar, lambda: self._fazer_gravacao(conjunto, pasta, parar), None, True)).start()
+            id_, pasta, parar, lambda: self._fazer_gravacao(conjunto, pasta, parar, idioma), None, True)).start()
         return id_
 
-    def _fazer_gravacao(self, conjunto, pasta: Path, parar: threading.Event) -> tuple[int, float | None]:
+    def _fazer_gravacao(self, conjunto, pasta: Path, parar: threading.Event,
+                        idioma: str | None = "pt") -> tuple[int, float | None]:
         def progresso(gravado_s: float, atraso_s: float, pendentes: int) -> None:
             self._atualizar_trabalho(fase="parando" if parar.is_set() else "gravando", gravado_s=round(gravado_s, 1),
                                      atraso_s=round(atraso_s), atrasado=atraso_s > ATRASO_AVISO_S,
@@ -504,7 +506,7 @@ class Servico:
                 self._registrar_linha(f, Linha(t0, "[não consegui transcrever este trecho; o áudio ficou salvo]"))
 
             resultado = Gravacao(
-                conjunto, str(pasta), self.modelo, parar,
+                conjunto, str(pasta), self.modelo, parar, idioma=idioma,
                 ao_linha=lambda linha: self._registrar_linha(f, linha), ao_erro=erro_trecho,
                 ao_nivel=self._publicar_nivel, ao_progresso=progresso).executar()
         if resultado.falha:

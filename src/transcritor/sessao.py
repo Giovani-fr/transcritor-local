@@ -1,6 +1,7 @@
 """Fila + thread de transcrição ao vivo que nunca morre em silêncio."""
 from __future__ import annotations
 
+import inspect
 import queue
 import threading
 from typing import Callable
@@ -24,6 +25,7 @@ class TrabalhadorTranscricao:
 
     def __init__(self, modelo, ao_receber_linha: Callable[[str], None] | None = None,
                  processar: Callable = processar_trecho, *,
+                 idioma: str | None = "pt",
                  ao_linha: Callable[[Linha], None] | None = None,
                  ao_erro: Callable[[float, BaseException], None] | None = None,
                  ao_concluir: Callable[[float, float], None] | None = None):
@@ -31,6 +33,8 @@ class TrabalhadorTranscricao:
         self.saida = ao_receber_linha or (lambda texto: None)
         self.ao_linha, self.ao_erro, self.ao_concluir = ao_linha, ao_erro, ao_concluir
         self.processar = processar
+        self.idioma = idioma
+        self._aceita_idioma = len(inspect.signature(processar).parameters) >= 5
         self.fila: queue.Queue = queue.Queue()
         self.detector = DetectorFundo()
         self.thread = threading.Thread(target=self._rodar, daemon=True)
@@ -74,7 +78,9 @@ class TrabalhadorTranscricao:
                 return
             t0, audio = item
             try:
-                for linha in self.processar(self.modelo, audio, t0, self.detector):
+                args = (self.modelo, audio, t0, self.detector, self.idioma) if self._aceita_idioma else (
+                    self.modelo, audio, t0, self.detector)
+                for linha in self.processar(*args):
                     if self.ao_linha:
                         self.ao_linha(linha)
                     else:

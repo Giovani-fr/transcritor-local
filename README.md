@@ -2,6 +2,7 @@
 
 Transcrição de áudio, vídeo e reuniões **100% local**: sem API, sem assinatura e sem custo. Usa o Whisper
 (via [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper)) no seu próprio PC, com uma interface web simples em português.
+Transcreve falas em **português, inglês e espanhol**, ou **detecta o idioma automaticamente frase a frase** (útil em aulas e reuniões bilíngues).
 
 > English version: [README.en.md](README.en.md)
 
@@ -166,13 +167,13 @@ O aviso aparece aberto na primeira vez e fica recolhido depois ("Saiba mais" mos
 1. Abra a aba **Arquivo** e arraste o áudio ou vídeo (ou clique em **Escolher arquivo**).
 2. Acompanhe o progresso. **Parar** interrompe e guarda o que já foi transcrito.
 3. No resultado: **Copiar texto**, **Baixar .txt** ou **Abrir pasta**. A chave **Mostrar horários** liga e desliga os horários.
-4. Em **Avançado** dá para escolher o idioma (português, inglês, espanhol ou detectar sozinho).
+4. Em **Avançado** dá para escolher o idioma (português, inglês, espanhol ou detectar sozinho frase a frase).
 5. As transcrições anteriores ficam em "Transcrições anteriores", na mesma tela.
 
 ### YouTube
 1. Abra a aba **YouTube**, cole o link e clique em **Buscar vídeo**.
 2. Escolha **Rápido** (usa as legendas do YouTube; é imediato, mas só funciona se o vídeo tiver legendas) ou **Preciso**
-   (baixa o áudio e transcreve com o Whisper; serve para vídeos sem legenda).
+   (baixa o áudio e transcreve com o Whisper; serve para vídeos sem legenda e permite escolher o idioma em **Avançado**).
 3. O áudio baixado é **apagado ao terminar**, a menos que você marque a opção de guardá-lo.
 4. Se o download falhar, quase sempre o `yt-dlp` está desatualizado porque o YouTube mudou. O programa mostra o botão
    **Atualizar yt-dlp agora**, que só instala depois de você confirmar ("Vou instalar a versão mais recente do yt-dlp.
@@ -180,7 +181,7 @@ O aviso aparece aberto na primeira vez e fica recolhido depois ("Saiba mais" mos
 
 ### Gravar
 1. Abra a aba **Gravar**. Os medidores de nível mostram, antes de gravar, se o som está chegando (nada é gravado nesse momento).
-2. Escolha **Reunião** (som do computador + microfone) ou **Ambiente** (só o microfone). Em **Avançado** você escolhe o microfone.
+2. Escolha **Reunião** (som do computador + microfone) ou **Ambiente** (só o microfone). Em **Avançado** você escolhe o idioma (português, inglês, espanhol ou detectar sozinho) e o microfone.
 3. No modo Reunião aparece um lembrete para **avisar os participantes** de que a reunião será gravada e transcrita.
 4. Clique em **Iniciar gravação**. O texto aparece por trechos de 30 s; falas mais baixas levam a marca "(fundo)".
    Se o som ficar baixo ou mudo, o programa avisa.
@@ -208,7 +209,8 @@ flowchart LR
 ```
 
 - **Motor:** `faster-whisper` com o modelo `large-v3-turbo` na placa Nvidia ou `small` no processador (`base` se houver
-  menos de 6 GB de RAM). O áudio é normalizado só para o Whisper; o arquivo original não é alterado.
+  menos de 6 GB de RAM). O áudio é normalizado só para o Whisper; o arquivo original não é alterado. Quando o idioma fica
+  em "Detectar automaticamente", ativa `multilingual=True` para identificar o idioma de cada segmento individualmente.
 - **Gravar:** capta o microfone e o som do sistema por WASAPI (biblioteca `PyAudioWPatch`), converte para 16 kHz mono,
   guarda um `.wav` em blocos de 10 min e envia trechos de 30 s para o Whisper em outra thread.
 - **Interface:** servidor FastAPI local; o navegador recebe o progresso por eventos (SSE). O front-end é HTML, CSS e JavaScript
@@ -222,7 +224,8 @@ Estrutura: `src/transcritor/` (motor, serviço, captura, YouTube, web), `tests/`
 
 ## Limitações
 
-- **Não separa falantes:** o texto sai corrido, sem "Pessoa 1 / Pessoa 2".
+- **Não separa falantes:** o texto sai corrido, sem "Pessoa 1 / Pessoa 2". Se duas pessoas falarem exatamente ao mesmo tempo
+  (vozes sobrepostas), o modelo transcreve a voz mais alta ou pode se confundir.
 - **Gravação ao vivo só no Windows** (captura WASAPI). Em outros sistemas a aba Gravar avisa que não está disponível.
 - **Reunião:** testado com o som do computador (um vídeo tocando) e o microfone juntos, mas **não** com Meet, Zoom e Teams um a
   um (veja o estado do projeto, no começo).
@@ -234,7 +237,7 @@ Estrutura: `src/transcritor/` (motor, serviço, captura, YouTube, web), `tests/`
 - **Medições** de velocidade valem para um notebook (i5-13420H + RTX 3050); o mínimo de 4 núcleos é estimativa.
 - **YouTube:** pode quebrar quando o YouTube muda. Atualizar o `yt-dlp` costuma resolver. O modo Rápido só funciona se o
   vídeo tiver legendas.
-- A interface está só em **português do Brasil**.
+- A interface (botões e avisos) está em **português do Brasil**, embora transcreva falas em português, inglês, espanhol ou detecção automática.
 
 ## Uso responsável
 

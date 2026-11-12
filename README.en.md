@@ -2,7 +2,8 @@
 
 **100% local** audio, video and meeting transcription: no API, no subscription, no cost. It runs Whisper
 (through [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper)) on your own PC, with a simple web interface
-(the interface itself is in Brazilian Portuguese).
+(the interface itself is in Brazilian Portuguese). It transcribes speech in **Portuguese, English and Spanish**, or
+**auto-detects the language phrase by phrase** (useful for bilingual lectures and meetings).
 
 > Versão em português: [README.md](README.md)
 
@@ -172,13 +173,13 @@ The notice is shown open the first time and collapsed afterwards ("Saiba mais" s
 2. Follow the progress. **Parar** (Stop) interrupts and keeps what was already transcribed.
 3. In the result: **Copiar texto** (copy), **Baixar .txt** (download) or **Abrir pasta** (open folder). The **Mostrar horários**
    switch turns timestamps on and off.
-4. Under **Avançado** (Advanced) you can pick the language (Portuguese, English, Spanish or auto-detect).
+4. Under **Avançado** (Advanced) you can pick the language (Portuguese, English, Spanish or phrase-by-phrase auto-detect).
 5. Earlier transcripts are listed under "Transcrições anteriores" on the same screen.
 
 ### YouTube
 1. Open the **YouTube** tab, paste the link and click **Buscar vídeo** (find video).
 2. Choose **Rápido** (Fast: uses YouTube's captions; instant, but only works if the video has captions) or **Preciso**
-   (Precise: downloads the audio and transcribes it with Whisper; works for videos without captions).
+   (Precise: downloads the audio and transcribes it with Whisper; works for videos without captions and lets you pick the language under **Avançado**).
 3. The downloaded audio is **deleted when done**, unless you tick the option to keep it.
 4. If the download fails, it is almost always because `yt-dlp` is out of date after a YouTube change. The program shows an
    **Atualizar yt-dlp agora** (update yt-dlp now) button, which installs only after you confirm ("Vou instalar a versão mais
@@ -186,7 +187,7 @@ The notice is shown open the first time and collapsed afterwards ("Saiba mais" s
 
 ### Gravar (Record)
 1. Open the **Gravar** tab. The level meters show, before recording, whether sound is arriving (nothing is recorded at this point).
-2. Choose **Reunião** (system sound + microphone) or **Ambiente** (microphone only). Under **Avançado** you pick the microphone.
+2. Choose **Reunião** (system sound + microphone) or **Ambiente** (microphone only). Under **Avançado** you pick the language (Portuguese, English, Spanish or auto-detect) and the microphone.
 3. In Reunião mode a reminder appears to **tell the participants** that the meeting will be recorded and transcribed.
 4. Click **Iniciar gravação** (start). Text appears in 30 s chunks; quieter speech gets a "(fundo)" (background) mark.
    If the sound is too low or silent, the program warns you.
@@ -214,7 +215,8 @@ flowchart LR
 ```
 
 - **Engine:** `faster-whisper` with the `large-v3-turbo` model on an Nvidia card, or `small` on the processor (`base` if there
-  is less than 6 GB of RAM). Audio is normalized only for Whisper; the original file is never changed.
+  is less than 6 GB of RAM). Audio is normalized only for Whisper; the original file is never changed. When the language is set
+  to "Detectar automaticamente" (auto-detect), it enables `multilingual=True` to detect the language of each segment individually.
 - **Record:** captures the microphone and system sound through WASAPI (the `PyAudioWPatch` library), converts to 16 kHz mono,
   saves a `.wav` in 10-minute blocks and sends 30 s chunks to Whisper on another thread.
 - **Interface:** local FastAPI server; the browser receives progress through events (SSE). The front end is plain HTML, CSS and
@@ -228,7 +230,8 @@ Layout: `src/transcritor/` (engine, service, capture, YouTube, web), `tests/`, `
 
 ## Limitations
 
-- **No speaker separation:** the text comes out as one stream, without "Person 1 / Person 2".
+- **No speaker separation:** the text comes out as one stream, without "Person 1 / Person 2". If two people talk at the exact
+  same time (overlapping voices), the model transcribes the louder voice or may get confused.
 - **Live recording is Windows-only** (WASAPI capture). On other systems the Record tab says it is unavailable.
 - **Reunião:** tested with computer sound (a video playing) and the microphone together, but **not** with Meet, Zoom and Teams
   one by one (see the project status at the top).
@@ -239,7 +242,7 @@ Layout: `src/transcritor/` (engine, service, capture, YouTube, web), `tests/`, `
 - **Quality depends on the audio:** noise, strong accents, music or several people talking at once make results worse.
 - **Speed measurements** hold for one laptop (i5-13420H + RTX 3050); the 4-core minimum is an estimate.
 - **YouTube:** can break when YouTube changes. Updating `yt-dlp` usually fixes it. Fast mode only works if the video has captions.
-- The interface is in **Brazilian Portuguese** only.
+- The interface (buttons and notices) is in **Brazilian Portuguese**, while transcribing speech in Portuguese, English, Spanish or auto-detect.
 
 ## Responsible use
 
