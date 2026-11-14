@@ -24,7 +24,9 @@ README use **simulated data** (invented sentences and synthetic audio), generate
 | ✅ Tested with a real microphone | the **Gravar** (Record) tab, **Ambiente** (room) mode: a 29 s recording on 2026-11-11, with correct text |
 | ✅ Tested with simulated capture only | the **Gravar** tab: levels, chunks, lag, saved audio and device errors |
 | ✅ Tested with real system sound and microphone | the **Gravar** tab, **Reunião** mode: a 1 min 6 s recording on 2026-11-11 with a video playing on the computer and a voice on the microphone (`large-v3-turbo` model): both level meters moved, the audio was saved in the folder and the text, with timestamps, came out correct |
-| ⏳ **Not tested** | Meet, Zoom and Teams one by one |
+| ✅ Tested in real use (2026-11-14) | the **Gravar** tab, with `large-v3-turbo` on the graphics card, both finished without errors and with no dropouts logged: a 1 h 4 min session in **Ambiente** mode (689 lines of text, 7 audio blocks of 10 min) and a 35 min 21 s meeting on **Google Meet** in **Reunião** mode (776 lines; the text kept up with the meeting live; 2022 s of processing for 2121 s of audio). Text accuracy was **not evaluated** |
+| ✅ Tested | **Google Meet** in Reunião mode (2026-11-14) |
+| ⏳ **Not tested** | Zoom and Teams |
 
 ## Contents
 
@@ -48,7 +50,7 @@ transcribes it with Whisper and, by default, **deletes the audio when done**.
 
 ### Gravar (Record)
 Records live and shows the text in 30 s chunks. The **Reunião** (Meeting) source captures system sound plus the microphone
-(should work for Meet, Zoom and Teams, which play their sound through Windows; not tested one by one); **Ambiente** (Room) captures the microphone only. The original audio is saved in 10-minute blocks.
+(tested with Google Meet; it should also work for Zoom and Teams, which play their sound through Windows, but they were not tested); **Ambiente** (Room) captures the microphone only. The original audio is saved in 10-minute blocks.
 
 <img src="docs/prints/43-gravando-texto-ao-vivo.png" alt="Record tab recording a meeting, with level meters and live text" width="560">
 
@@ -57,8 +59,13 @@ Records live and shows the text in 30 s chunks. The **Reunião** (Meeting) sourc
 > ✅ **Reunião** mode was tested on 2026-11-11 with **computer sound and the microphone at the same time**: a 1 min 6 s
 > recording of a video playing on the PC, with a voice on the microphone (`large-v3-turbo` model), moved both level meters,
 > left the audio saved in the folder and produced correct text with timestamps.
-> ⏳ **Not tested:** Meet, Zoom and Teams individually (the program captures whatever sound Windows plays on the default
-> output, so it should work with them, but that was not verified one by one).
+> ✅ **Real use on 2026-11-14**, with `large-v3-turbo` on the graphics card, no errors and no dropouts logged:
+> a 1 h 4 min session in **Ambiente** mode (689 lines, 7 audio blocks of 10 min) and a 35 min 21 s meeting on
+> **Google Meet** in **Reunião** mode (776 lines; the text kept up with the meeting live; 2022 s of processing for 2121 s
+> of audio). Text accuracy was not evaluated.
+> ✅ **Tested:** Google Meet.
+> ⏳ **Not tested:** Zoom and Teams (the program captures whatever sound Windows plays on the default output, so it should
+> work with them, but that was not verified).
 
 ## Requirements
 
@@ -227,7 +234,8 @@ The notice is shown open the first time and collapsed afterwards ("Saiba mais" s
    in 10-minute blocks, and is never deleted.
 
 > ✅ **Ambiente** tested with a real microphone and **Reunião** tested with computer sound (a video playing) and the
-> microphone together, both on 2026-11-11. ⏳ **Not tested:** Meet, Zoom and Teams one by one.
+> microphone together, both on 2026-11-11. On 2026-11-14 there was real use of 1 h 4 min in Ambiente and 35 min 21 s on
+> **Google Meet** (Reunião mode), without errors. ⏳ **Not tested:** Zoom and Teams.
 
 The light/dark theme follows the system (and there is a button to switch), and the layout adapts to narrow windows.
 
@@ -265,8 +273,8 @@ Layout: `src/transcritor/` (engine, service, capture, YouTube, web), `tests/`, `
 - **No speaker separation:** the text comes out as one stream, without "Person 1 / Person 2". If two people talk at the exact
   same time (overlapping voices), the model transcribes the louder voice or may get confused.
 - **Live recording is Windows-only** (WASAPI capture). On other systems the Record tab says it is unavailable.
-- **Reunião:** tested with computer sound (a video playing) and the microphone together, but **not** with Meet, Zoom and Teams
-  one by one (see the project status at the top).
+- **Reunião:** tested with computer sound (a video playing) and the microphone together and with Google Meet, but **not** with Zoom
+  and Teams (see the project status at the top).
 - **Small models hallucinate more on the processor.** Over noise, `base` invented "E aí!" and `small` once invented a subtitle
   credit (now filtered) in tests with synthetic noise; the graphics card with `large-v3-turbo` invented nothing. The filter
   drops known hallucinations, but short, plausible phrases can still get through.

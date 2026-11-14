@@ -22,7 +22,9 @@ processador (veja [Funciona sem placa de vídeo?](#funciona-sem-placa-de-vídeo)
 | ✅ Testado com microfone real | aba **Gravar**, modo **Ambiente**: gravação de 29 s em 11/11/2026, com o texto correto |
 | ✅ Testado só com captura simulada | aba **Gravar**: níveis, trechos, atraso, áudio salvo e erros de dispositivo |
 | ✅ Testado com som do sistema e microfone reais | aba **Gravar**, modo **Reunião**: gravação de 1 min 6 s em 11/11/2026 com um vídeo tocando no computador e a voz no microfone (modelo `large-v3-turbo`): as duas barras de nível mexeram, o áudio ficou guardado na pasta e o texto, com horários, saiu correto |
-| ⏳ **Não testado** | Meet, Zoom e Teams um a um |
+| ✅ Testado em uso real (14/11/2026) | aba **Gravar**, com `large-v3-turbo` na placa de vídeo, ambas concluídas sem erro e sem nenhuma queda registrada: uma sessão de 1 h 4 min no modo **Ambiente** (689 linhas de texto, 7 blocos de áudio de 10 min) e uma reunião de 35 min 21 s pelo **Google Meet** no modo **Reunião** (776 linhas; o texto acompanhou a reunião ao vivo; 2022 s de processamento para 2121 s de áudio). A precisão do texto **não foi avaliada** |
+| ✅ Testado | **Google Meet** no modo Reunião (14/11/2026) |
+| ⏳ **Não testado** | Zoom e Teams |
 
 ## Sumário
 
@@ -46,7 +48,7 @@ baixa só o áudio, transcreve com o Whisper e, por padrão, **apaga o áudio ao
 
 ### Gravar
 Grava ao vivo e mostra o texto por trechos de 30 s. A fonte **Reunião** capta o som do computador mais o microfone
-(deve servir para Meet, Zoom e Teams, que tocam o som pelo Windows; não foram testados um a um); **Ambiente** capta só o microfone. O áudio original é guardado em blocos de 10 min.
+(testada com o Google Meet; deve servir também para Zoom e Teams, que tocam o som pelo Windows, mas eles não foram testados); **Ambiente** capta só o microfone. O áudio original é guardado em blocos de 10 min.
 
 <img src="docs/prints/43-gravando-texto-ao-vivo.png" alt="Aba Gravar gravando uma reunião, com medidores de nível e texto ao vivo" width="560">
 
@@ -55,8 +57,13 @@ Grava ao vivo e mostra o texto por trechos de 30 s. A fonte **Reunião** capta o
 > ✅ O modo **Reunião** foi testado em 11/11/2026 com o **som do computador e o microfone ao mesmo tempo**: uma gravação de
 > 1 min 6 s de um vídeo tocando no PC, com a voz no microfone (modelo `large-v3-turbo`), mexeu as duas barras de nível,
 > deixou o áudio guardado na pasta e o texto, com horários, correto.
-> ⏳ **Não testado:** Meet, Zoom e Teams individualmente (o programa capta o som que o Windows toca na saída padrão, então
-> deve funcionar com eles, mas isso não foi verificado um a um).
+> ✅ **Uso real em 14/11/2026**, com `large-v3-turbo` na placa de vídeo, sem erro e sem nenhuma queda registrada:
+> uma sessão de 1 h 4 min no modo **Ambiente** (689 linhas, 7 blocos de áudio de 10 min) e uma reunião de 35 min 21 s pelo
+> **Google Meet** no modo **Reunião** (776 linhas; o texto acompanhou a reunião ao vivo; 2022 s de processamento para 2121 s
+> de áudio). A precisão do texto não foi avaliada.
+> ✅ **Testado:** Google Meet.
+> ⏳ **Não testado:** Zoom e Teams (o programa capta o som que o Windows toca na saída padrão, então deve funcionar com
+> eles, mas isso não foi verificado).
 
 ## Requisitos
 
@@ -221,7 +228,8 @@ O aviso aparece aberto na primeira vez e fica recolhido depois ("Saiba mais" mos
    e nunca é apagado.
 
 > ✅ **Ambiente** testado com microfone real e **Reunião** testado com o som do computador (um vídeo tocando) e o microfone
-> juntos, ambos em 11/11/2026. ⏳ **Não testado:** Meet, Zoom e Teams um a um.
+> juntos, ambos em 11/11/2026. Em 14/11/2026 houve uso real de 1 h 4 min no Ambiente e de 35 min 21 s no **Google Meet**
+> (modo Reunião), sem erro. ⏳ **Não testado:** Zoom e Teams.
 
 O tema claro/escuro segue o do sistema (e há um botão para trocar), e o layout se adapta a janelas estreitas.
 
@@ -259,8 +267,8 @@ Estrutura: `src/transcritor/` (motor, serviço, captura, YouTube, web), `tests/`
 - **Não separa falantes:** o texto sai corrido, sem "Pessoa 1 / Pessoa 2". Se duas pessoas falarem exatamente ao mesmo tempo
   (vozes sobrepostas), o modelo transcreve a voz mais alta ou pode se confundir.
 - **Gravação ao vivo só no Windows** (captura WASAPI). Em outros sistemas a aba Gravar avisa que não está disponível.
-- **Reunião:** testado com o som do computador (um vídeo tocando) e o microfone juntos, mas **não** com Meet, Zoom e Teams um a
-  um (veja o estado do projeto, no começo).
+- **Reunião:** testado com o som do computador (um vídeo tocando) e o microfone juntos e com o Google Meet, mas **não** com Zoom
+  e Teams (veja o estado do projeto, no começo).
 - **Modelos pequenos alucinam mais em processador.** Sobre ruído, o `base` inventou "E aí!" e o `small` já inventou um crédito
   de legenda (hoje filtrado) nos testes com ruído sintético; a placa de vídeo com `large-v3-turbo` não inventou nada. O filtro
   descarta as alucinações conhecidas, mas frases curtas e plausíveis ainda podem passar.
