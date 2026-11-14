@@ -81,3 +81,15 @@ def test_queda_sem_parar_desiste_depois_de_5_tentativas(tmp_path):
 def test_o_bat_usa_so_ascii_e_o_limite_de_encerramento():
     texto = (RAIZ / "iniciar.bat").read_bytes()
     assert all(b < 128 for b in texto) and b"--timeout-graceful-shutdown 3" in texto
+
+
+def test_sem_ambiente_manda_rodar_o_instalar_bat_sem_mostrar_comandos(tmp_path):
+    projeto = tmp_path / "projeto"
+    projeto.mkdir()
+    (projeto / "iniciar.bat").write_bytes((RAIZ / "iniciar.bat").read_bytes())
+    casa = tmp_path / "casa"
+    casa.mkdir()
+    r = subprocess.run(["cmd", "/c", str(projeto / "iniciar.bat")], env={**__import__("os").environ, "USERPROFILE": str(casa)},
+                       input="\r\n", capture_output=True, text=True, timeout=60)
+    assert r.returncode == 1 and "Rode primeiro o instalar.bat" in r.stdout
+    assert "py -3.12" not in r.stdout and "pip" not in r.stdout

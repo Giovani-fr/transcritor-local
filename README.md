@@ -26,7 +26,7 @@ processador (veja [Funciona sem placa de vídeo?](#funciona-sem-placa-de-vídeo)
 
 ## Sumário
 
-[As 3 funções](#as-3-funções) · [Requisitos](#requisitos) · [Instalação](#instalação-em-3-passos) ·
+[As 3 funções](#as-3-funções) · [Requisitos](#requisitos) · [Instalação](#instalação) ·
 [Sem placa de vídeo](#funciona-sem-placa-de-vídeo) · [Como usar](#como-usar) · [Como funciona](#como-funciona-por-baixo) ·
 [Limitações](#limitações) · [Uso responsável](#uso-responsável) · [Licenças](#licenças-de-terceiros) · [Contribuir](#contribuir)
 
@@ -63,7 +63,7 @@ Grava ao vivo e mostra o texto por trechos de 30 s. A fonte **Reunião** capta o
 | | Mínimo (**estimativa**) | Recomendado |
 |---|---|---|
 | Sistema | Windows 10 ou 11 de 64 bits (testado só no 11) | Windows 11 |
-| Python | 3.12 (usado no desenvolvimento; outras versões não foram testadas) | 3.12 |
+| Python | 3.12 (o `instalar.bat` instala sozinho se faltar; o 3.15 não funciona) | 3.12 |
 | Processador | 4 núcleos | 8 núcleos ou mais |
 | Memória (RAM) | 8 GB | 16 GB |
 | Placa de vídeo | não é obrigatória | Nvidia com 4 GB de memória ou mais |
@@ -103,40 +103,72 @@ NVIDIA GeForce RTX 3050 Laptop (4 GB). Áudio de teste: 173 s de fala sintética
 
 Detalhes e método em [`docs/benchmark.md`](docs/benchmark.md).
 
-## Instalação em 3 passos
+## Instalação
 
-Testado no Windows 11. Os comandos são para o **PowerShell**.
+Testado no Windows 11. Você **não precisa saber programar** e nem precisa do git.
 
-**1. Instale o Python 3.12** em [python.org](https://www.python.org/downloads/) e baixe este projeto
-(`git clone https://github.com/Giovani-fr/transcritor-local` ou "Download ZIP").
+1. **Baixe o projeto:** na página do projeto no GitHub, clique em **Code → Download ZIP** e extraia o ZIP inteiro
+   (botão direito → *Extrair tudo*) numa pasta, por exemplo em *Documentos*. (Quem usa git pode fazer
+   `git clone https://github.com/Giovani-fr/transcritor-local`.)
+2. **Dê dois cliques em `instalar.bat`.** Ele faz tudo sozinho e explica cada passo na janela preta:
+   procura o Python 3.12, cria o ambiente do programa, instala as bibliotecas, instala as bibliotecas da placa de vídeo
+   se encontrar uma Nvidia (baixa cerca de 2 GB) e cria o atalho **Transcritor local** na área de trabalho.
+   Leva de 5 a 20 minutos, conforme a internet. Tudo fica gravado em `instalar.log`.
+3. **Dê dois cliques em `iniciar.bat`** (ou no atalho da área de trabalho). Ele abre o navegador em `http://127.0.0.1:8765`.
+   Na primeira vez a tela pede para baixar o modelo (botão **Baixar e começar**; ≈ 0,5 GB no processador, ≈ 1,6 GB com placa de vídeo).
 
-**2. Crie o ambiente e instale as dependências** (dentro da pasta do projeto). O ambiente fica fora da pasta do projeto
-de propósito, para não ser sincronizado se ela estiver no OneDrive:
+**Não tem o Python 3.12?** O `instalar.bat` percebe e pergunta se pode instalá-lo para você (pelo *winget*, o instalador
+oficial do Windows). Você responde **S** e ele continua sozinho, sem precisar reiniciar o Windows. Se o seu Windows não tiver
+o winget, ele abre a página de download e diz o que fazer: baixar o **3.12**, não a versão mais recente.
+
+**Por que o 3.12 e não outro Python?** As bibliotecas de voz são feitas para versões específicas do Python. Em 13/11/2026
+conferi que as bibliotecas do projeto têm pacote pronto para o Python 3.12, 3.13 e 3.14, mas **não para o 3.15**
+(o `av` fixado em `requirements.txt` não tem versão para ele). No 3.14 os testes rápidos do projeto passaram (234), mas só o 3.12 foi usado de ponta a ponta
+(com o modelo e o microfone) e é o que o instalador procura. Ter outro Python no computador não atrapalha: o 3.12 convive com ele.
+
+Para fechar o programa, aperte **Ctrl+C** na janela preta (se ela perguntar *"Deseja finalizar o arquivo em lotes (S/N)?"*, responda **S**).
+Se o programa cair por um erro grave, o `iniciar.bat` o abre de novo sozinho (até 5 vezes); fechar de propósito nunca o reinicia.
+O programa só atende o seu próprio computador (`127.0.0.1`): ninguém na sua rede consegue abrir.
+
+Se você tem placa Nvidia e ela não foi usada (por exemplo, o driver estava antigo na hora de instalar), o programa percebe: mostra o aviso
+*"Encontrei sua placa Nvidia, mas faltam as bibliotecas para usá-la. Rode: `pip install -r requirements-gpu.txt`"*, com o
+botão **Copiar comando**, e enquanto isso usa o processador. Rodar o `instalar.bat` de novo também resolve.
+Só diz *"não encontrei placa Nvidia"* quando não há placa.
+
+### Instalação manual
+
+Para quem prefere os comandos (PowerShell, dentro da pasta do projeto). O ambiente fica **fora** da pasta do projeto
+de propósito, para não ser sincronizado se ela estiver no OneDrive. Precisa do Python 3.12 já instalado
+(em [python.org](https://www.python.org/downloads/windows/), versão 3.12.x):
 
 ```powershell
 py -3.12 -m venv "$env:USERPROFILE\venvs\transcritor-local"
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements.txt
 ```
 
-Se o PC tem **placa de vídeo Nvidia** (com o driver atualizado), instale também as bibliotecas CUDA para ela ser usada
-(baixa cerca de 2 GB e pode levar vários minutos):
+Só se o PC tem **placa Nvidia** (com o driver atualizado; baixa cerca de 2 GB):
 
 ```powershell
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements-gpu.txt
 ```
 
-Sem placa Nvidia, **pule este comando**: o programa usa o processador sozinho.
+Depois, `iniciar.bat`.
 
-Se você tem placa Nvidia e esqueceu este comando (ou o driver está antigo), o programa percebe: mostra o aviso
-*"Encontrei sua placa Nvidia, mas faltam as bibliotecas para usá-la. Rode: `pip install -r requirements-gpu.txt`"*, com o
-botão **Copiar comando**, e enquanto isso usa o processador. Só diz *"não encontrei placa Nvidia"* quando não há placa.
+### Problemas comuns
 
-**3. Abra o programa:** dê dois cliques em `iniciar.bat`. Ele abre o navegador em `http://127.0.0.1:8765`.
-Para fechar, aperte **Ctrl+C** na janela preta (se ela perguntar *"Deseja finalizar o arquivo em lotes (S/N)?"*, responda **S**).
-Se o programa cair por um erro grave, o `iniciar.bat` o abre de novo sozinho (até 5 vezes); fechar de propósito nunca o reinicia.
-Na primeira vez a tela pede para baixar o modelo (botão **Baixar e começar**; ≈ 0,5 GB no processador, ≈ 1,6 GB com placa de vídeo).
-
-O programa só atende o seu próprio computador (`127.0.0.1`): ninguém na sua rede consegue abrir.
+- **"Não achei o Python 3.12" / "Encontrei o Python 3.15, mas este programa precisa do 3.12".** Ter outro Python, como o
+  3.15, não basta: o programa precisa especificamente do 3.12. Deixe o `instalar.bat` instalá-lo (responda **S**) ou
+  baixe o 3.12.x em [python.org](https://www.python.org/downloads/windows/) (**não** a versão mais recente) e rode o
+  `instalar.bat` de novo. O comando manual `py -3.12` falha exatamente por isso.
+- **"A instalação das bibliotecas falhou."** Quase sempre é internet fora do ar ou instável, ou um antivírus/proxy bloqueando
+  o download. Confira a conexão e rode o `instalar.bat` de novo: ele continua de onde parou. Se falhar outra vez, abra o
+  `instalar.log` (na pasta do projeto) e veja as linhas que começam com `ERROR`.
+- **"A janela fechou sozinha."** O `instalar.bat` e o `iniciar.bat` sempre esperam uma tecla antes de fechar. Se a janela
+  sumiu mesmo assim, você provavelmente abriu o arquivo de dentro do ZIP sem extrair: extraia o ZIP inteiro e abra o arquivo
+  da pasta extraída. Se continuar, abra o *Prompt de Comando*, arraste o `instalar.bat` para ele e aperte Enter: a janela fica aberta e mostra a mensagem.
+- **"O programa ainda não foi instalado neste computador."** (ao abrir o `iniciar.bat`). Rode primeiro o `instalar.bat`.
+- **O Windows mostra "O Windows protegeu o computador".** É o aviso padrão para arquivos baixados da internet.
+  Clique em *Mais informações → Executar assim mesmo* (o arquivo é texto simples; você pode abri-lo no Bloco de Notas e conferir).
 
 ## Funciona sem placa de vídeo?
 

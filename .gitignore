@@ -31,3 +31,6 @@ huggingface/
 .vscode/
 .idea/
 Thumbs.db
+
+# Registro do instalador (pode ter caminhos do PC)
+instalar.log

@@ -3,8 +3,10 @@ rem Inicia o transcritor-local e abre o navegador. (Arquivo so com ASCII de prop
 rem O venv fica fora do OneDrive para nao sincronizar varios GB.
 set "VENV=%USERPROFILE%\venvs\transcritor-local"
 if not exist "%VENV%\Scripts\python.exe" (
-    echo Ambiente nao encontrado em %VENV%
-    echo Rode antes:  py -3.12 -m venv "%VENV%"  e  "%VENV%\Scripts\pip" install -r requirements.txt
+    echo.
+    echo O programa ainda nao foi instalado neste computador.
+    echo Rode primeiro o instalar.bat, que fica nesta mesma pasta, e depois abra este arquivo de novo.
+    echo.
     pause
     exit /b 1
 )

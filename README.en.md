@@ -28,7 +28,7 @@ README use **simulated data** (invented sentences and synthetic audio), generate
 
 ## Contents
 
-[The 3 features](#the-3-features) · [Requirements](#requirements) · [Install](#install-in-3-steps) ·
+[The 3 features](#the-3-features) · [Requirements](#requirements) · [Install](#installation) ·
 [Without a graphics card](#does-it-work-without-a-graphics-card) · [How to use](#how-to-use) · [How it works](#how-it-works) ·
 [Limitations](#limitations) · [Responsible use](#responsible-use) · [Third-party licenses](#third-party-licenses) · [Contributing](#contributing)
 
@@ -65,7 +65,7 @@ Records live and shows the text in 30 s chunks. The **Reunião** (Meeting) sourc
 | | Minimum (**estimate**) | Recommended |
 |---|---|---|
 | System | 64-bit Windows 10 or 11 (tested on 11 only) | Windows 11 |
-| Python | 3.12 (used in development; other versions not tested) | 3.12 |
+| Python | 3.12 (`instalar.bat` installs it if missing; 3.15 does not work) | 3.12 |
 | Processor | 4 cores | 8 cores or more |
 | Memory (RAM) | 8 GB | 16 GB |
 | Graphics card | not required | Nvidia with 4 GB of memory or more |
@@ -105,42 +105,74 @@ NVIDIA GeForce RTX 3050 Laptop (4 GB). Test audio: 173 s of clean synthetic Port
 
 Details and method in [`docs/benchmark.md`](docs/benchmark.md) (in Portuguese).
 
-## Install in 3 steps
+## Installation
 
-Tested on Windows 11. Commands are for **PowerShell**.
+Tested on Windows 11. You do **not** need to know programming, and you do not need git.
 
-**1. Install Python 3.12** from [python.org](https://www.python.org/downloads/) and get this project
-(`git clone https://github.com/Giovani-fr/transcritor-local` or "Download ZIP").
+1. **Download the project:** on the project's GitHub page click **Code → Download ZIP** and extract the whole ZIP
+   (right-click → *Extract all*) into a folder, for example *Documents*. (If you use git:
+   `git clone https://github.com/Giovani-fr/transcritor-local`.)
+2. **Double-click `instalar.bat`.** It does everything by itself and explains each step in the black window (in Portuguese):
+   it looks for Python 3.12, creates the program's environment, installs the libraries, installs the graphics-card
+   libraries if it finds an Nvidia card (about 2 GB download) and creates a **Transcritor local** shortcut on the desktop.
+   It takes 5 to 20 minutes depending on your internet. Everything is logged to `instalar.log`.
+3. **Double-click `iniciar.bat`** (or the desktop shortcut). It opens your browser at `http://127.0.0.1:8765`.
+   The first time, the screen asks you to download the model (**Baixar e começar** button; ≈ 0.5 GB on the processor, ≈ 1.6 GB with a graphics card).
 
-**2. Create the environment and install the dependencies** (inside the project folder). The environment lives outside the
-project folder on purpose, so it is not synced if the folder is inside OneDrive:
+**Do not have Python 3.12?** `instalar.bat` notices and asks whether it may install it for you (through *winget*, Windows'
+official installer). Answer **S** (yes) and it carries on by itself, with no need to restart Windows. If your Windows has no
+winget, it opens the download page and tells you what to do: download **3.12**, not the latest version.
+
+**Why 3.12 and not another Python?** The speech libraries are built for specific Python versions. On 2026-11-13 I checked
+that the project's libraries have ready-made packages for Python 3.12, 3.13 and 3.14, but **not for 3.15** (the `av` version
+pinned in `requirements.txt` has none for it). On 3.14 the project's quick tests passed (234), but only 3.12 has been used end to end
+(with the model and the microphone), and it is what the installer looks for.
+Having another Python on the computer does no harm: 3.12 lives alongside it.
+
+To quit, press **Ctrl+C** in the black window (if it asks *"Deseja finalizar o arquivo em lotes (S/N)?"* — "Terminate batch job?" — answer **S** for yes).
+If the program crashes with a serious error, `iniciar.bat` starts it again on its own (up to 5 times); quitting on purpose never restarts it.
+The program only serves your own computer (`127.0.0.1`): nobody on your network can open it.
+
+If you have an Nvidia card and it was not used (for example, the driver was old at install time), the program notices: it shows the notice
+*"Encontrei sua placa Nvidia, mas faltam as bibliotecas para usá-la. Rode: `pip install -r requirements-gpu.txt`"*
+("I found your Nvidia card, but the libraries to use it are missing"), with a **Copiar comando** (copy command) button, and
+meanwhile uses the processor. Running `instalar.bat` again also fixes it. It only says "I did not find an Nvidia card" when there really is none.
+
+### Manual installation
+
+For those who prefer commands (PowerShell, inside the project folder). The environment lives **outside** the project folder
+on purpose, so it is not synced if the folder is inside OneDrive. Needs Python 3.12 already installed
+(from [python.org](https://www.python.org/downloads/windows/), version 3.12.x):
 
 ```powershell
 py -3.12 -m venv "$env:USERPROFILE\venvs\transcritor-local"
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements.txt
 ```
 
-If the PC has an **Nvidia graphics card** (with an up-to-date driver), also install the CUDA libraries so it gets used
-(it downloads about 2 GB and can take several minutes):
+Only if the PC has an **Nvidia card** (with an up-to-date driver; about 2 GB download):
 
 ```powershell
 & "$env:USERPROFILE\venvs\transcritor-local\Scripts\pip" install -r requirements-gpu.txt
 ```
 
-Without an Nvidia card, **skip this command**: the program uses the processor on its own.
+Then run `iniciar.bat`.
 
-If you have an Nvidia card and forgot this command (or the driver is old), the program notices: it shows the notice
-*"Encontrei sua placa Nvidia, mas faltam as bibliotecas para usá-la. Rode: `pip install -r requirements-gpu.txt`"*
-("I found your Nvidia card, but the libraries to use it are missing"), with a **Copiar comando** (copy command) button, and
-meanwhile uses the processor. It only says "I did not find an Nvidia card" when there really is none.
+### Common problems
 
-**3. Start the program:** double-click `iniciar.bat`. It opens your browser at `http://127.0.0.1:8765`.
-To quit, press **Ctrl+C** in the black window (if it asks *"Deseja finalizar o arquivo em lotes (S/N)?"* — "Terminate batch job?" — answer **S** for yes).
-If the program crashes with a serious error, `iniciar.bat` starts it again on its own (up to 5 times); quitting on purpose never restarts it.
-The first time, the screen asks you to download the model (**Baixar e começar** button; ≈ 0.5 GB on the processor,
-≈ 1.6 GB with a graphics card).
-
-The program only serves your own computer (`127.0.0.1`): nobody on your network can open it.
+- **"Nao encontrei o Python" / "Encontrei o Python 3.15, mas este programa precisa do 3.12" (I did not find Python 3.12).**
+  Having another Python, such as 3.15, is not enough: the program needs exactly 3.12. Let `instalar.bat` install it (answer
+  **S**) or download 3.12.x from [python.org](https://www.python.org/downloads/windows/) (**not** the latest version) and run
+  `instalar.bat` again. The manual `py -3.12` command fails for exactly this reason.
+- **"A instalacao das bibliotecas falhou" (installing the libraries failed).** Almost always the internet is down or unstable,
+  or an antivirus/proxy is blocking the download. Check the connection and run `instalar.bat` again: it resumes where it
+  stopped. If it fails again, open `instalar.log` (in the project folder) and look at the lines starting with `ERROR`.
+- **"The window closed by itself."** `instalar.bat` and `iniciar.bat` always wait for a key before closing. If the window
+  vanished anyway, you probably opened the file from inside the ZIP without extracting it: extract the whole ZIP and open the
+  file from the extracted folder. If it continues, open *Command Prompt*, drag `instalar.bat` into it and press Enter: the window stays open and shows the message.
+- **"O programa ainda nao foi instalado neste computador" (the program is not installed yet)** when opening `iniciar.bat`.
+  Run `instalar.bat` first.
+- **Windows shows "Windows protected your PC".** That is the standard warning for files downloaded from the internet.
+  Click *More info → Run anyway* (the file is plain text; you can open it in Notepad and check).
 
 ## Does it work without a graphics card?
 
