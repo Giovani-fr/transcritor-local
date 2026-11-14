@@ -47,7 +47,7 @@ class Registro:
     def __init__(self):
         self.linhas, self.erros, self.progresso, self.niveis, self.trechos = [], [], [], [], []
 
-    def processar(self, modelo, audio, t0, detector):
+    def processar(self, modelo, audio, t0, detector, idioma="pt"):
         self.trechos.append((t0, len(audio) / SR))
         return [Linha(t0, f"trecho em {int(t0)}")]
 
@@ -122,7 +122,7 @@ def test_dispositivo_que_some_encerra_e_guarda_o_que_foi_gravado(tmp_path):
 
 
 def test_erro_em_um_trecho_nao_derruba_a_gravacao(tmp_path):
-    def processar(modelo, audio, t0, detector):
+    def processar(modelo, audio, t0, detector, idioma="pt"):
         if t0 == 30.0:
             raise ValueError("falha simulada")
         return [Linha(t0, f"ok {int(t0)}")]
@@ -137,7 +137,7 @@ def test_erro_em_um_trecho_nao_derruba_a_gravacao(tmp_path):
 def test_atraso_da_transcricao_e_indicado(tmp_path):
     liberar = threading.Event()
 
-    def lento(modelo, audio, t0, detector):
+    def lento(modelo, audio, t0, detector, idioma="pt"):
         liberar.wait(10)
         return []
 

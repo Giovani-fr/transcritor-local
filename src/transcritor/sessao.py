@@ -1,7 +1,6 @@
 """Fila + thread de transcrição ao vivo que nunca morre em silêncio."""
 from __future__ import annotations
 
-import inspect
 import queue
 import threading
 from typing import Callable
@@ -34,7 +33,6 @@ class TrabalhadorTranscricao:
         self.ao_linha, self.ao_erro, self.ao_concluir = ao_linha, ao_erro, ao_concluir
         self.processar = processar
         self.idioma = idioma
-        self._aceita_idioma = len(inspect.signature(processar).parameters) >= 5
         self.fila: queue.Queue = queue.Queue()
         self.detector = DetectorFundo()
         self.thread = threading.Thread(target=self._rodar, daemon=True)
@@ -78,9 +76,7 @@ class TrabalhadorTranscricao:
                 return
             t0, audio = item
             try:
-                args = (self.modelo, audio, t0, self.detector, self.idioma) if self._aceita_idioma else (
-                    self.modelo, audio, t0, self.detector)
-                for linha in self.processar(*args):
+                for linha in self.processar(self.modelo, audio, t0, self.detector, idioma=self.idioma):
                     if self.ao_linha:
                         self.ao_linha(linha)
                     else:
