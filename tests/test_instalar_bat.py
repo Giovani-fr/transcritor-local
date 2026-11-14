@@ -1,9 +1,12 @@
 """instalar.bat: mensagens e caminhos de falha, sem instalar nada de verdade.
 
 O PC de teste nunca é tocado: "py" e "winget" são falsos (.bat numa pasta que entra primeiro no PATH),
-LOCALAPPDATA/ProgramFiles/USERPROFILE apontam para pastas vazias e o PATH só tem o Windows.
+LOCALAPPDATA/ProgramFiles/USERPROFILE apontam para pastas vazias e o PATH só tem a pasta dos falsos e uma pasta
+"sistema" com cópias de where.exe e choice.exe (as únicas ferramentas do Windows que o .bat acha pelo PATH).
+Assim o resultado não depende do que estiver instalado na máquina: no runner do GitHub, por exemplo, o py.exe fica na pasta do Windows e acha os Pythons de hostedtoolcache, o que não pode entrar no teste.
 """
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -30,8 +33,12 @@ def rodar(tmp_path, *, py=None, winget=None, resposta="N"):
     if winget is not None:
         (falsos / "winget.bat").write_text(winget.replace("@CHAMADAS@", str(chamadas)), encoding="ascii")
     windows = os.environ["SystemRoot"]
+    sistema = tmp_path / "sistema"
+    sistema.mkdir()
+    for exe in ("where.exe", "choice.exe"):
+        shutil.copy(Path(windows) / "System32" / exe, sistema / exe)
     env = {"SystemRoot": windows, "ComSpec": f"{windows}\\System32\\cmd.exe",
-           "PATH": f"{falsos};{windows}\\System32;{windows}",
+           "PATH": f"{falsos};{sistema}",
            "USERPROFILE": str(vazio), "LOCALAPPDATA": str(vazio), "ProgramFiles": str(vazio),
            "ProgramW6432": str(vazio), "TEMP": str(vazio), "INSTALAR_SEM_NAVEGADOR": "1",
            "INSTALAR_ATALHO_PASTA": str(vazio)}
@@ -48,6 +55,24 @@ WINGET_FALSO = '@echo off\necho %* >> "@CHAMADAS@"\nexit /b 0\n'
 
 def test_o_bat_usa_so_ascii():
     assert all(b < 128 for b in (RAIZ / "instalar.bat").read_bytes())
+
+
+def test_o_bat_nao_tem_caracteres_de_controle():
+    """Uma barra mais f digitada errada vira quebra de página e o comando fica "System32<FF>indstr.exe"."""
+    dados = (RAIZ / "instalar.bat").read_bytes()
+    assert not [b for b in dados if b < 32 and b not in (9, 10, 13)]
+
+
+def test_o_resultado_nao_depende_do_py_instalado_na_maquina(tmp_path, monkeypatch):
+    """Um py.exe real no PATH de quem roda o teste (como no runner do GitHub) não pode ser visto pelo .bat."""
+    plantado = tmp_path / "plantado"
+    plantado.mkdir()
+    (plantado / "py.bat").write_text(f'@echo off\n"{sys.executable}" %2 %3 %4\n', encoding="ascii")
+    monkeypatch.setenv("PATH", f"{plantado};{os.environ['PATH']}")
+    sub = tmp_path / "t"
+    sub.mkdir()
+    codigo, saida, _, _ = rodar(sub)
+    assert codigo == 1 and "Nao encontrei o Python neste computador" in saida
 
 
 def test_sem_python_nenhum_e_sem_winget_manda_baixar_o_3_12(tmp_path):

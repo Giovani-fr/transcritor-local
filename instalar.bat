@@ -152,7 +152,7 @@ echo Nao consegui instalar as bibliotecas da placa de video.
 echo O programa vai funcionar normalmente, so que mais devagar, usando o processador.
 echo O que fazer: para tentar de novo mais tarde, rode o instalar.bat outra vez.
 echo Mensagens de erro encontradas:
-%SystemRoot%\System32indstr.exe /b /c:"ERROR" "%LOG%"
+%SystemRoot%\System32\findstr.exe /b /c:"ERROR" "%LOG%"
 
 rem ---------- 5. Atalho ----------
 :atalho
@@ -191,7 +191,7 @@ echo A instalacao das bibliotecas falhou.
 echo O que fazer: confira se o computador esta com internet e rode o instalar.bat de novo.
 echo Ele continua de onde parou. Se falhar outra vez, mande o arquivo instalar.log para quem te ajuda.
 echo Mensagens de erro encontradas:
-%SystemRoot%\System32indstr.exe /b /c:"ERROR" "%LOG%"
+%SystemRoot%\System32\findstr.exe /b /c:"ERROR" "%LOG%"
 goto fim_erro
 
 :fim_erro
