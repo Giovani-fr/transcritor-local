@@ -30,7 +30,7 @@ processador (veja [Funciona sem placa de vídeo?](#funciona-sem-placa-de-vídeo)
 
 [As 3 funções](#as-3-funções) · [Requisitos](#requisitos) · [Instalação](#instalação) ·
 [Sem placa de vídeo](#funciona-sem-placa-de-vídeo) · [Como usar](#como-usar) · [Como funciona](#como-funciona-por-baixo) ·
-[Limitações](#limitações) · [Uso responsável](#uso-responsável) · [Licenças](#licenças-de-terceiros) · [Contribuir](#contribuir)
+[Limitações](#limitações) · [Uso responsável](#uso-responsável) · [Licenças](#licenças-de-terceiros) · [Como usei IA](#como-usei-ia) · [Contribuir](#contribuir)
 
 ## As 3 funções
 
@@ -313,6 +313,30 @@ respectivos repositórios; as informações abaixo são as declaradas nos pacote
 | [Playwright](https://github.com/microsoft/playwright-python) (só `requirements-dev.txt`) | gerar os prints | Apache-2.0 |
 
 O programa não inclui nenhum desses componentes: eles são instalados por `pip` na sua máquina.
+
+## Como usei IA
+
+Este projeto foi feito com a ajuda do Claude Code (um assistente de IA para programar), com revisão e decisões minhas.
+A tabela abaixo lista só problemas que realmente apareceram e que dá para conferir no histórico do Git (mensagens de
+commit e testes). A IA escreveu a maior parte do código; o que ela errou, ou não previu, foi achado ao usar e testar.
+
+| O que pedi à IA | Problema que apareceu | Como foi corrigido e validado |
+|---|---|---|
+| Transcrever com o Whisper | Em silêncio ou ruído o modelo inventa frases como "Obrigado." (documentado em `filtros.py`) | Filtro de alucinações em `filtros.py`, com testes em `tests/test_filtros.py` (inclusive frases parecidas que **não** podem ser cortadas) |
+| Transcrever a fala ao vivo, trecho a trecho | O texto das reticências entrava como contexto do trecho seguinte e o modelo entrava em loop de "..." | Sem `initial_prompt` e com `condition_on_previous_text=False`, ou seja, sem contexto entre trechos (explicado no cabeçalho de `motor.py`) |
+| Captura de microfone e do som do computador | O programa fechava sozinho com *access violation* na biblioteca de áudio, quando a listagem de dispositivos reiniciava o PortAudio com outra captura aberta | Reproduzido com um teste de estresse (`scripts/estresse_captura.py`); corrigido com a captura em processo separado e uma instância única do PyAudio com trava (commit `cef2158`) e testes de morte do processo |
+| Instalar as dependências | O faster-whisper 1.2.1 quebra com a versão nova do `av`, e o `av` não tem pacote pronto para o Python 3.15 | `av==15.1.0` fixado em `requirements.txt`; `instalar.bat` que só aceita o Python 3.12, com testes em `tests/test_instalar_bat.py` |
+| Testes do `instalar.bat` e CI | Os testes passavam no meu PC e falharam no CI, porque o `py.exe` do servidor era encontrado | PATH isolado só com programas falsos nos testes; o CI voltou a passar (commit `8191e76`) |
+| Preparar o repositório | O `requirements-gpu.txt` estava escondido pelo `*.txt` do `.gitignore` e não ia para o repositório; apareceu no teste de instalação do zero | `.gitignore` com exceção para ele (commit `18e5ca7`) |
+| Fechar o programa com Ctrl+C | Com a página aberta (conexões SSE) o Ctrl+C travava, e o reinício automático do `iniciar.bat` reiniciava em vez de fechar | Conexões SSE terminam ao receber o sinal; reinício só se o `crash.log` ganhou uma falha fatal; testes de encerramento real em `tests/test_encerramento.py` (commits `476c14a` e `2b36d7f`) |
+
+**O que foi decisão minha, não da IA:**
+
+- **Privacidade como requisito:** nada de áudio, vídeo ou transcrição vai para o repositório nem para a internet, e as regras do `.gitignore` foram pedidas por mim desde o primeiro commit.
+- **Começar com o repositório privado** e só decidir sobre torná-lo público depois de conferir o histórico.
+- **As regras de uso:** uso pessoal, aviso de consentimento ao gravar reuniões e prints apenas com dados simulados.
+- **Só o Python 3.12 no instalador**, e o que testar em hardware real (o que não foi testado está dito neste README).
+- Revisar, rodar e aceitar ou recusar o que a IA propôs: nenhum resultado foi dado como pronto sem teste.
 
 ## Contribuir
 
