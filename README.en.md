@@ -322,23 +322,24 @@ The program does not bundle any of these components: they are installed by `pip`
 ## How I used AI
 
 This project was built with the help of Claude Code (an AI coding assistant), with my own review and decisions.
-The table below lists only problems that really happened and can be checked in the Git history (commit messages and
-tests). The AI wrote most of the code; what it got wrong, or did not foresee, was found by using and testing the program.
+The table below lists only problems that really happened. Most can be checked in the Git history (commits and tests);
+the others are my own observations from real use. The last column says, for each row, which kind it is. The AI wrote most
+of the code; what it got wrong, or did not foresee, was found by using and testing the program.
 
-| What I asked the AI for | Problem that appeared | How it was fixed and validated |
-|---|---|---|
-| Transcribe with Whisper | On silence or noise the model invents phrases such as "Obrigado." ("Thank you", documented in `filtros.py`) | Hallucination filter in `filtros.py`, with tests in `tests/test_filtros.py` (including similar phrases that must **not** be cut) |
-| Transcribe live speech, chunk by chunk | The text of an ellipsis was fed as context to the next chunk and the model fell into a loop of "..." | No `initial_prompt` and `condition_on_previous_text=False`, i.e. no context between chunks (explained in the header of `motor.py`) |
-| Capture the microphone and the computer sound | The program closed by itself with an *access violation* in the audio library, when the device listing restarted PortAudio while another capture was open | Reproduced with a stress test (`scripts/estresse_captura.py`); fixed with capture in a separate process and a single locked PyAudio instance (commit `cef2158`), plus tests for the process dying |
-| Install the dependencies | faster-whisper 1.2.1 breaks with the new `av` version, and `av` has no ready-made package for Python 3.15 | `av==15.1.0` pinned in `requirements.txt`; an `instalar.bat` that accepts only Python 3.12, with tests in `tests/test_instalar_bat.py` |
-| Tests for `instalar.bat` and CI | The tests passed on my PC and failed on CI, because the server's `py.exe` was found | PATH isolated with fake programs only in the tests; CI passes again (commit `8191e76`) |
-| Prepare the repository | `requirements-gpu.txt` was hidden by `*.txt` in `.gitignore` and never reached the repository; found in a from-scratch install test | `.gitignore` exception for it (commit `18e5ca7`) |
-| Close the program with Ctrl+C | With the page open (SSE connections) Ctrl+C hung, and the automatic restart of `iniciar.bat` restarted instead of closing | SSE connections end on the signal; restart only if `crash.log` gained a fatal failure; real shutdown tests in `tests/test_encerramento.py` (commits `476c14a` and `2b36d7f`) |
+| What I asked the AI for | Problem that appeared | How it was fixed and validated | Kind |
+|---|---|---|---|
+| Transcribe with Whisper | On silence or noise the model invents phrases such as "Obrigado." ("Thank you", documented in `filtros.py`) | Hallucination filter in `filtros.py`, with tests in `tests/test_filtros.py` (including similar phrases that must **not** be cut) | Observed by me: "Obrigado." showed up repeatedly when recording a long session of ambient audio in real use. In Git: `filtros.py` and its tests |
+| Transcribe live speech, chunk by chunk | The text of an ellipsis was fed as context to the next chunk and the model fell into a loop of "..." | No `initial_prompt` and `condition_on_previous_text=False`, i.e. no context between chunks (explained in the header of `motor.py`) | Checkable in Git |
+| Capture the microphone and the computer sound | The program closed by itself with an *access violation* in the audio library, when the device listing restarted PortAudio while another capture was open | Reproduced with a stress test (`scripts/estresse_captura.py`); fixed with capture in a separate process and a single locked PyAudio instance (commit `cef2158`), plus tests for the process dying | Checkable in Git |
+| Install the dependencies | faster-whisper 1.2.1 breaks with the new `av` version, and `av` has no ready-made package for Python 3.15 | `av==15.1.0` pinned in `requirements.txt`; an `instalar.bat` that accepts only Python 3.12, with tests in `tests/test_instalar_bat.py` | Observed by me: the install on a second computer, which had only Python 3.15, failed. In Git: `requirements.txt`, the installer and its tests |
+| Tests for `instalar.bat` and CI | The tests passed on my PC and failed on CI, because the server's `py.exe` was found | PATH isolated with fake programs only in the tests; CI passes again (commit `8191e76`) | Checkable in Git |
+| Prepare the repository | `requirements-gpu.txt` was hidden by `*.txt` in `.gitignore` and never reached the repository; found in a from-scratch install test | `.gitignore` exception for it (commit `18e5ca7`) | Checkable in Git |
+| Close the program with Ctrl+C | With the page open (SSE connections) Ctrl+C hung, and the automatic restart of `iniciar.bat` restarted instead of closing | SSE connections end on the signal; restart only if `crash.log` gained a fatal failure; real shutdown tests in `tests/test_encerramento.py` (commits `476c14a` and `2b36d7f`) | Checkable in Git |
 
 **What I decided, not the AI:**
 
-- **Privacy as a requirement:** no audio, video or transcript goes into the repository or onto the internet, and the `.gitignore` rules were requested by me from the first commit.
-- **Starting with a private repository** and only deciding about making it public after checking the history.
+- **Privacy as a requirement:** no audio, video or transcript goes into the repository or onto the internet; the `.gitignore` blocks audio, video and transcripts from the first commit, at my insistence.
+- **Checking the Git history** (audio, transcripts, e-mails, the Windows user name and personal data) before publicizing the project.
 - **The usage rules:** personal use, a consent reminder when recording meetings, and screenshots with simulated data only.
 - **Python 3.12 only in the installer**, and what to test on real hardware (what was not tested is stated in this README).
 - Reviewing, running and accepting or rejecting what the AI proposed: no result was treated as done without a test.
